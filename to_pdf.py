@@ -5,41 +5,55 @@ from typing import List, Dict, Union
 from config import Note, Highlight
 
 from extractor import extract_highlights
-from config import PATH_TO_KINDLE, OUTPUT_DATA_FOLDER, OFFSETS_BY_BOOK_NAME
+from config import PATH_TO_KINDLE, OUTPUT_DATA_FOLDER, OFFSETS_BY_BOOK_NAME, CONTENT_SPLIT_KEY
 
 # Function to extract text from specific page of PDF
 '''
 pdf_path: the path to the book pdf (inside kindle)
 page_numbers: a list storing the page numbers we want to read. If it is not a list of int, converts it to an int
+contents: a list of highlights / notes for a specific book
 '''
-def extract_text_from_pdf(pdf_path: str, page_numbers: List, book_name: None, highlighted_content: None):
+def extract_text_from_pdf(contents: List[Union[Highlight, Note]], book_name: None):
     # Open the PDF file
-    if pdf_path is None:
-        print("The following path provided is null. This could be because this file is not a PDF, but has a highlight. Skipping for now.")
-        return None
     offset = 0
     #some books will require an offset.
     if book_name in OFFSETS_BY_BOOK_NAME.keys():
         offset = OFFSETS_BY_BOOK_NAME[book_name]
-    print("Offset, book > ", offset, book_name)
+    print("Offset, book > ", offset, repr(book_name))
+
+    
+    partial_path = os.path.join(PATH_TO_KINDLE, 'documents', 'Downloads', 'Items01')
+    pdf_path = find_pdf_path(book_name, partial_path) #gets the book pdf path
+
+    if pdf_path is None:
+        print("The following path provided is null. This could be because this file is not a PDF, but has a highlight. Skipping for now.")
+        return None
 
     with open(pdf_path, 'rb') as file:
         # Create a PDF reader object
         pdf_reader = PyPDF2.PdfReader(file)
+        # loop through each highlight / note in the book
+        content_texts = []
+        for index, content in enumerate(contents):
         # Initialize an empty string to store text from specified pages
-        text = "HIGHLIGHTED CONTENT: "+highlighted_content+'\n' if highlighted_content is not None else ''
-        intified = int(page_numbers[0])
-        # read pages +-1 above the target
-        page_numbers = [intified-1, intified, intified+1]
-        # Iterate over page numbers
-        for page_number in page_numbers:
-            page_number = page_number - 1 + offset # Page numbers are 0-based in PyPDF2
-            # Check if the page number is valid
-            if 0 <= page_number < len(pdf_reader.pages):
-                # Extract text from the specified page
-                page_text = pdf_reader.pages[page_number].extract_text()
-                text += page_text
-        return text
+            highlighted_content = content.content 
+            page_numbers = content.page.split("-")
+
+            text = "HIGHLIGHTED CONTENT: "+highlighted_content+f' {CONTENT_SPLIT_KEY}\n' if highlighted_content is not None else ''
+            intified = int(page_numbers[0])
+            # read pages +-1 above the target
+            page_numbers = [intified-1, intified, intified+1]
+            # Iterate over page numbers
+            for page_number in page_numbers:
+                page_number = page_number - 1 + offset # Page numbers are 0-based in PyPDF2
+                # Check if the page number is valid
+                if 0 <= page_number < len(pdf_reader.pages):
+                    # Extract text from the specified page
+                    page_text = pdf_reader.pages[page_number].extract_text()
+                    text += page_text
+            content_texts.append(text)
+            # text = ''
+        return content_texts
 
 '''
 Returns the path to the pdf of the book with book_nme
@@ -69,24 +83,38 @@ params:
     data_folder: the output folder where data is uploaded
     highlights: the highlights list, from extract_highlights
 '''
-def make_pdf_from_highlight(data_folder: str, highlight: List[Union[Note, Highlight]], pdf_path: str, book_name=None):
+def make_pdf_from_highlight(data_folder: str, highlights: Dict[str, List[Union[Note, Highlight]]]):
     # for idx, highlight in enumerate(highlights):
         # Extract text from PDF based on page numbers
-    highlighto = highlight.__dict__
-    marked_content = None
-    if type(highlight) == Highlight:
-        marked_content = highlighto['content']
-    text = extract_text_from_pdf(pdf_path, highlighto['page'].split('-'), book_name, marked_content)
 
-    if text == None:
-        print("Did not recieve any text ^^")
-        print("Exiting this book")
-        return None
+    book_contents_dict = {}
+    for book_name in highlights.keys():
+        # highlighto = highlight.__dict__
+        # marked_content = None
+        # if type(highlight) == Highlight:
+        #     marked_content = highlighto['content']
+        # text = extract_text_from_pdf(pdf_path, highlighto['page'].split('-'), book_name, marked_content)
+        texts = extract_text_from_pdf(highlights[book_name], book_name)
+        book_contents_dict[book_name] = texts
 
-    # Save extracted text to a file in the data folder
-    output_file = os.path.join(os.getcwd(), data_folder, f"info_{highlighto['title']}_{highlighto['author']}_{highlighto['page']}.txt")
-    with open(output_file, 'w', encoding='utf-8') as file:
-        file.write(text)
+    # if text == None:
+    #     print("Did not recieve any text ^^")
+    #     print("Exiting this book")
+    #     return None
+
+    #iterate through each book
+    for book in book_contents_dict.keys():
+        #some books may have no highlights OR they are not pdf (eg: Data Engineering Book of mine)
+        if book_contents_dict[book] is None: 
+            continue 
+        #iterate through each read item
+        for index, text in enumerate(book_contents_dict[book]):
+            # Save extracted text to a file in the data folder
+            author = highlights[book][index].author
+            pages = highlights[book][index].page
+            output_file = os.path.join(os.getcwd(), data_folder, f"info_{book}_{author}_{pages}.txt")
+            with open(output_file, 'w', encoding='utf-8') as file:
+                file.write(text)
 
     print(f"Highlight text saved to {output_file}")
 
@@ -105,14 +133,14 @@ def main():
             os.makedirs(OUTPUT_DATA_FOLDER)
 
         # Process each highlight
-        for idx, highlight in enumerate(highlights):
-            # Extract text from PDF based on page numbers
-            partial_path = os.path.join(PATH_TO_KINDLE, 'documents', 'Downloads', 'Items01')
-            pdf_path = find_pdf_path(highlight.title, partial_path) #gets the book pdf path
+        # for idx, highlight in enumerate(highlights):
+        #     # Extract text from PDF based on page numbers
+        # partial_path = os.path.join(PATH_TO_KINDLE, 'documents', 'Downloads', 'Items01')
+        # pdf_path = find_pdf_path(highlight.title, partial_path) #gets the book pdf path
 
-            # Save extracted text to a file in the data folder
-            # output_file = os.path.join(OUTPUT_DATA_FOLDER, f"highlight_{idx + 1}.txt")
-            make_pdf_from_highlight(OUTPUT_DATA_FOLDER, highlight, pdf_path, highlight.title)
+        # Save extracted text to a file in the data folder
+        # output_file = os.path.join(OUTPUT_DATA_FOLDER, f"highlight_{idx + 1}.txt")
+        make_pdf_from_highlight(OUTPUT_DATA_FOLDER, highlights)
 
             # print(f"Highlight {idx + 1} text saved to {output_file}")
     else:

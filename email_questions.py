@@ -6,85 +6,73 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from requests import HTTPError
+from matplotlib import pyplot as plt
+import matplotlib
+import easylatex2image
+from easylatex2image import latex_to_image
 
 q_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER)
 assert os.path.exists(q_path), "No questions and answer folder found. Make sure to create them!"
 assert len(os.listdir(q_path)) > 0, "Nothing found inside the questions directory. Make sure to add questions!"
 
 load_dotenv()
+EMAIL = os.getenv("SENDER_MAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-import base64
-from email.message import EmailMessage
+def convert_latex2img(latex_str, image_name="temp_latex_image.png"):
+    """Converts LaTeX string to a base64-encoded PNG image."""
+    packages_and_commands = r"""\usepackage[parfill]{parskip}
+    \usepackage[german]{varioref}
+    \usepackage{url}
+    \usepackage{amsmath} 
+    \usepackage{dcolumn}
+    \usepackage{tikz}
+    \usetikzlibrary{shapes,arrows}
+    \usetikzlibrary{intersections}
+    \usepackage[all,cmtip]{xy}
+    """
 
-import google.auth
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-from google.oauth2 import service_account
-from google_auth_oauthlib.flow import InstalledAppFlow
-import google.auth
-
-
-def gmail_send_message():
-  """Create and send an email message
-  Print the returned  message id
-  Returns: Message object, including message id
-
-  Load pre-authorized user credentials from the environment.
-  TODO(developer) - See https://developers.google.com/identity
-  for guides on implementing OAuth2 for the application.
-  """
-  client_secret_file = os.path.join(os.getcwd(), 'client_secret_1054281926341-k2m55o2nbp1a4mq4nlka460dlr16afd4.apps.googleusercontent.com.json')
-  flow = InstalledAppFlow.from_client_secrets_file(
-    client_secret_file,
-    scopes=['https://www.googleapis.com/auth/gmail.send']
-    )
-  
-  creds = flow.run_local_server(port=0)
-  service = build('gmail.googleapis.com', 'v1', credentials=creds)
-  print("PAST")
-
-  message = MIMEText("This is some test email. Ignore")
-  message['to'] = os.getenv("RECEIVER_MAIL")
-  message['subject'] = 'Test Mail'
-  create_message = {'raw': base64.urlsafe_b64decode(message.as_bytes()).decode()}
-
-  try:
-    message = (service.users().messages().send(userid="me", body=create_message).execute())
-    print("Send Message!")
-  except HTTPError as e:
-    print(f"An error occured: {e}")
-    message = None
-  return message
+    content = r"""
+    \xymatrix{M \ar[d]_\kappa \ar[r]^f & A\\ K \ar[ur]_{f_K}}
+    """
+    path = os.path.join(os.getcwd(), 'temp', 'output.jpg')
+    pillow_image = latex_to_image(packages_and_commands,content,path,dpi=500,img_type="JPEG")
+    print(pillow_image)
+        
 
 
+def generate_html_content():
+    latex_str = "x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"
+    image_base64 = latex_to_image(latex_str)
+    html_content = f'<html><body><img src="data:image/png;base64,{image_base64}"><p>Hopefully something rendered!</p></body></html>'
+    return html_content
 
-#   try:
-#     service = build("gmail", "v1", credentials=creds)
-#     message = EmailMessage()
+def send_email():
+    sender_email = EMAIL
+    receiver_email = os.getenv("RECEIVER_MAIL")
+    password = EMAIL_PASSWORD
 
-#     message.set_content("This is automated draft mail. Though, let's test it! <h1> Hola </h1>")
+    message = MIMEMultipart("alternative")
+    message["From"] = sender_email
+    message["To"] = receiver_email
+    message["Subject"] = "Sending First Mail"
 
-#     message["To"] = os.getenv("RECEIVER_MAIL")
-#     message["From"] = os.getenv("SENDER_MAIL")
-#     message["Subject"] = "Question Digest"
+    html_content = generate_html_content()
 
-#     # encoded message
-#     encoded_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
-
-#     create_message = {"raw": encoded_message}
-#     # pylint: disable=E1101
-#     send_message = (
-#         service.users()
-#         .messages()
-#         .send(userId="me", body=create_message)
-#         .execute()
-#     )
-#     print(f'Message Id: {send_message["id"]}')
-#   except HttpError as error:
-#     print(f"An error occurred: {error}")
-#     send_message = None
-#   return send_message
+    part = MIMEText(html_content, "html")
+    message.attach(part)
 
 
-gmail_send_message()
+    try:
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
+        server.login(sender_email, password)
+        server.sendmail(sender_email, receiver_email, message.as_string())
+        print("Email sent successfully!")
+    except Exception as e:
+        print(f"Failed to send email. Error: {e}")
+    finally:
+        server.quit()
+
+# send_email()
+latex = "A combination of both text and latex component. Let's see what happens! \(a\neq b\Longleftrightarrow b\neq a\)"
+convert_latex2img(latex)

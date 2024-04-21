@@ -6,7 +6,7 @@ from config import Note, Highlight
 
 # Function to extract highlights and notes from "My Clippings.txt" file
 def extract_highlights(filepath: str) -> List[Union[Note, Highlight]]:
-    highlights = []
+    highlights = {}
     with open(filepath, 'r', encoding='utf-8') as file:
         lines = file.readlines()
         title = ''
@@ -22,7 +22,10 @@ def extract_highlights(filepath: str) -> List[Union[Note, Highlight]]:
                 else: #if highlight
                     my_obj = Highlight(title, author, content)
 
-                highlights.append(my_obj)
+                #check if book is already in the highlight keys
+                if my_obj.title not in highlights.keys():
+                    highlights[my_obj.title] = []
+                highlights[my_obj.title].append(my_obj)
                 # Reset variables for the next highlight
                 title = ''
                 author = ''
@@ -40,14 +43,15 @@ def extract_highlights(filepath: str) -> List[Union[Note, Highlight]]:
 
 def print_highlights(highlights):
     # Print highlights
-    for idx, highlight in enumerate(highlights):
-        new_highligh = highlight.__dict__
-        print(f"Highlight {idx + 1}:")
-        print(f"Title: {new_highligh['title']}")
-        print(f"Author: {new_highligh['author']}")
-        print("Content:")
-        print(new_highligh['content'])
-        print("\n")
+    for book in highlights.keys():
+        print(f"-------------BOOK: {book}---------------")
+        for content in highlights[book]:
+            new_highligh = content.__dict__
+            print(f"Title: {new_highligh['title']}")
+            print(f"Author: {new_highligh['author']}")
+            print("Content:")
+            print(new_highligh['content'])
+            print("\n")
 
 def main():
     # Path to the "My Clippings.txt" file on your Kindle
