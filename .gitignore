@@ -3,3 +3,4 @@ data_stored
 *.env
 *client_secret*
 *question_answers*
+*temp*

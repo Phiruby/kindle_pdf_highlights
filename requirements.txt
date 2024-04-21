@@ -7,4 +7,3 @@ google-auth-httplib2
 google-auth-oauthlib
 appengine-python-standard>=1.0.0
 matplotlib
-easylatex2image

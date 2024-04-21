@@ -33,6 +33,7 @@ def get_prompt(highlighted_content: str, pdf_text: str, num_questions: int):
     return prompt
 
 from typing import Dict
+
 #Some classes
 class InformationStored:
     '''

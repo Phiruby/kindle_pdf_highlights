@@ -11,6 +11,7 @@ assert len(os.listdir(data_path)) > 0, "No data found inside the storage"
 load_dotenv()
 OPEN_AI_KEY = os.getenv("OPEN_AI_KEY")
 NUM_QUESTION_PAIRS = 2
+REGEN_QUESTIONS = False #creates questions for ALL highlights from scratch if true
 
 client = OpenAI(api_key = OPEN_AI_KEY)
 
@@ -24,6 +25,12 @@ def read_file_and_create_question(filename: str, num_questions: int) -> None:
         # print(repr(os.listdir(data_path)[-11]))
         raise Exception(f"Could not find the following in the data: {filename}")
     
+    qa_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER)
+    #if file already has questions created for it
+    if filename in qa_path and not REGEN_QUESTIONS:
+        print(f"The following file already has questions generated: {filename}. Set REGEN_QUESTIONS=True if you want to override these questions")
+        print("Skipping for now")
+        return None
     file_path = os.path.join(data_path, filename)
     question_answers = ''
     with open(file_path, 'rb') as file:

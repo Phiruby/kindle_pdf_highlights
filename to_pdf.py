@@ -12,8 +12,9 @@ from config import PATH_TO_KINDLE, OUTPUT_DATA_FOLDER, OFFSETS_BY_BOOK_NAME, CON
 pdf_path: the path to the book pdf (inside kindle)
 page_numbers: a list storing the page numbers we want to read. If it is not a list of int, converts it to an int
 contents: a list of highlights / notes for a specific book
+existing_highlights: returned from get_all_highlights()
 '''
-def extract_text_from_pdf(contents: List[Union[Highlight, Note]], book_name: None):
+def extract_text_from_pdf(contents: List[Union[Highlight, Note]], book_name: None, existing_highlights: None):
     # Open the PDF file
     offset = 0
     #some books will require an offset.
@@ -35,12 +36,18 @@ def extract_text_from_pdf(contents: List[Union[Highlight, Note]], book_name: Non
         # loop through each highlight / note in the book
         content_texts = []
         for index, content in enumerate(contents):
+            #checks if this highlight already exists
+            if check_if_highlight_exists(content.content, content.page, book_name, existing_highlights):
+                # print(content.__dict__)
+                content_texts.append(None)
+                continue 
+  
         # Initialize an empty string to store text from specified pages
             highlighted_content = content.content 
             page_numbers = content.page.split("-")
 
             text = "HIGHLIGHTED CONTENT: "+highlighted_content+f' {CONTENT_SPLIT_KEY}\n' if highlighted_content is not None else ''
-            intified = int(page_numbers[0])
+            intified = int(page_numbers[0].strip())
             # read pages +-1 above the target
             page_numbers = [intified-1, intified, intified+1]
             # Iterate over page numbers
@@ -88,35 +95,40 @@ def make_pdf_from_highlight(data_folder: str, highlights: Dict[str, List[Union[N
         # Extract text from PDF based on page numbers
 
     book_contents_dict = {}
+    existing_highlights = get_all_highlights()
     for book_name in highlights.keys():
-        # highlighto = highlight.__dict__
-        # marked_content = None
-        # if type(highlight) == Highlight:
-        #     marked_content = highlighto['content']
-        # text = extract_text_from_pdf(pdf_path, highlighto['page'].split('-'), book_name, marked_content)
-        texts = extract_text_from_pdf(highlights[book_name], book_name)
+
+        texts = extract_text_from_pdf(highlights[book_name], book_name, existing_highlights)
         book_contents_dict[book_name] = texts
 
-    # if text == None:
-    #     print("Did not recieve any text ^^")
-    #     print("Exiting this book")
-    #     return None
-
     #iterate through each book
+    index_sep = 0
     for book in book_contents_dict.keys():
         #some books may have no highlights OR they are not pdf (eg: Data Engineering Book of mine)
-        if book_contents_dict[book] is None: 
+        # in the case that the file already exists
+        if book_contents_dict[book] is None or len([x for x in book_contents_dict[book] if x is not None]) == 0: 
             continue 
+        print(f"Proceeding to write to file: {book}")
         #iterate through each read item
         for index, text in enumerate(book_contents_dict[book]):
+            if text is None: 
+                continue #text already saved
             # Save extracted text to a file in the data folder
             author = highlights[book][index].author
             pages = highlights[book][index].page
-            output_file = os.path.join(os.getcwd(), data_folder, f"info_{book}_{author}_{pages}.txt")
+            #in the case of multiple highlights on the same page
+            if os.path.exists(os.path.join(os.getcwd(), data_folder, f"info_{book}__{pages}.txt")):
+                output_file = os.path.join(os.getcwd(), data_folder, f"info_{book}__{pages}.txt"+str(index_sep))
+                index_sep+=1
+            else:
+                output_file = os.path.join(os.getcwd(), data_folder, f"info_{book}__{pages}.txt")
+
             with open(output_file, 'w', encoding='utf-8') as file:
                 file.write(text)
-
-    print(f"Highlight text saved to {output_file}")
+    try:
+        print(f"Highlight text saved to {output_file}")
+    except Exception as e:
+        print("Everything is already saved! Nothing changed.")
 
 # Main function
 def main():
@@ -146,5 +158,55 @@ def main():
     else:
         print("The 'My Clippings.txt' file was not found. Please provide the correct path.")
 
+'''
+gets all highlights, stored in the following format:
+{
+    name: (name of the book)
+    page: the first page number of the highlight
+    content: the highlighted content
+}
+The above dictionary will be in a list
+'''
+def get_all_highlights():
+    highlights_stored_path = os.path.join(os.getcwd(), OUTPUT_DATA_FOLDER)
+    all_highlights_dict = []
+    for highlight in os.listdir(highlights_stored_path):
+        with open(os.path.join(highlights_stored_path, highlight), 'r', encoding='utf-8') as file:
+            highlighted_cont, text = file.read().split(CONTENT_SPLIT_KEY)
+            new_dict = {}
+            new_dict['content'] = highlighted_cont[20:].strip() if highlighted_cont.startswith("HIGHLIGHTED CONTENT") else None 
+            name_and_page = highlight[5:].split('.txt')[0] #removes info_ and .txt 
+            name, pages = name_and_page.split('__')
+            page = pages.split("-")[0]
+            new_dict['page'] = int(page)
+            new_dict['name'] = name.strip()
+            all_highlights_dict.append(new_dict)
+    
+    return all_highlights_dict
+
+'''
+Returns a boolean if the highlight is already saved
+Params
+    content: the highlighted text / note
+    page: the pages ofthe highlight, formated x-y
+    book: the title of th book
+'''
+def check_if_highlight_exists(content: str, page: str, book: str, all_highlights: None):
+    assert all_highlights is not None, "Make sure you passed in the right highlights by calling get_all_highlights()"
+
+    new_dict = {
+        'content': content.strip(),
+        'page': int(page.split('-')[0]),
+        'name': book.strip()
+    }
+    # print(new_dict)
+    return (new_dict in all_highlights)
+
+
+
 if __name__ == "__main__":
     main()
+    # print(get_all_highlights())
+    # # tester = {'content': ' then ', 'page': 67, 'name': '\ufeffmain_notes'}
+    # # print(tester in get_all_highlights())
+    # print(check_if_highlight_exists(' then ', page="67-67", book='\ufeffmain_notes', all_highlights=get_all_highlights()))

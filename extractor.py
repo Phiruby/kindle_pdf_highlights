@@ -1,11 +1,11 @@
 import os
 from config import PATH_TO_KINDLE
-from typing import List, Union
+from typing import List, Union, Dict
 
 from config import Note, Highlight
 
 # Function to extract highlights and notes from "My Clippings.txt" file
-def extract_highlights(filepath: str) -> List[Union[Note, Highlight]]:
+def extract_highlights(filepath: str) -> Dict[str, List[Union[Note, Highlight]]]:
     highlights = {}
     with open(filepath, 'r', encoding='utf-8') as file:
         lines = file.readlines()
@@ -49,6 +49,7 @@ def print_highlights(highlights):
             new_highligh = content.__dict__
             print(f"Title: {new_highligh['title']}")
             print(f"Author: {new_highligh['author']}")
+            print(f"Pages: {new_highligh['page']}")
             print("Content:")
             print(new_highligh['content'])
             print("\n")
