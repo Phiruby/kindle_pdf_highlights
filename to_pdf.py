@@ -206,7 +206,4 @@ def check_if_highlight_exists(content: str, page: str, book: str, all_highlights
 
 if __name__ == "__main__":
     main()
-    # print(get_all_highlights())
-    # # tester = {'content': ' then ', 'page': 67, 'name': '\ufeffmain_notes'}
-    # # print(tester in get_all_highlights())
-    # print(check_if_highlight_exists(' then ', page="67-67", book='\ufeffmain_notes', all_highlights=get_all_highlights()))
+

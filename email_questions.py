@@ -64,6 +64,12 @@ def process_and_send_emails():
     processed_files = read_processed_files()
     qa_path = os.path.join(os.getcwd(), 'question_answers')
     files = [file for file in os.listdir(qa_path) if file.endswith('.txt') and file not in processed_files]
+    #reset processed files so the previous emails can show up again!
+    processed_path = os.path.join(os.getcwd(), 'temp', 'processed_files.txt')
+    with open(processed_path, 'w') as file:
+        pass #removes everything there
+
+    processed_files = [] #resset the processed files
     content = ''
     if files:
         selected_files = random.sample(files, min(FILES_PER_EMAIL, len(files)))
