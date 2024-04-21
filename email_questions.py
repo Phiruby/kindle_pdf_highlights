@@ -5,11 +5,8 @@ from dotenv import load_dotenv, dotenv_values
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from requests import HTTPError
-from matplotlib import pyplot as plt
-import matplotlib
-import easylatex2image
-from easylatex2image import latex_to_image
+import random
+
 
 q_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER)
 assert os.path.exists(q_path), "No questions and answer folder found. Make sure to create them!"
@@ -19,35 +16,9 @@ load_dotenv()
 EMAIL = os.getenv("SENDER_MAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-def convert_latex2img(latex_str, image_name="temp_latex_image.png"):
-    """Converts LaTeX string to a base64-encoded PNG image."""
-    packages_and_commands = r"""\usepackage[parfill]{parskip}
-    \usepackage[german]{varioref}
-    \usepackage{url}
-    \usepackage{amsmath} 
-    \usepackage{dcolumn}
-    \usepackage{tikz}
-    \usetikzlibrary{shapes,arrows}
-    \usetikzlibrary{intersections}
-    \usepackage[all,cmtip]{xy}
-    """
+FILES_PER_EMAIL = 5
 
-    content = r"""
-    \xymatrix{M \ar[d]_\kappa \ar[r]^f & A\\ K \ar[ur]_{f_K}}
-    """
-    path = os.path.join(os.getcwd(), 'temp', 'output.jpg')
-    pillow_image = latex_to_image(packages_and_commands,content,path,dpi=500,img_type="JPEG")
-    print(pillow_image)
-        
-
-
-def generate_html_content():
-    latex_str = "x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}"
-    image_base64 = latex_to_image(latex_str)
-    html_content = f'<html><body><img src="data:image/png;base64,{image_base64}"><p>Hopefully something rendered!</p></body></html>'
-    return html_content
-
-def send_email():
+def send_email(text):
     sender_email = EMAIL
     receiver_email = os.getenv("RECEIVER_MAIL")
     password = EMAIL_PASSWORD
@@ -55,11 +26,12 @@ def send_email():
     message = MIMEMultipart("alternative")
     message["From"] = sender_email
     message["To"] = receiver_email
-    message["Subject"] = "Sending First Mail"
+    message["Subject"] = "Question Digest"
 
-    html_content = generate_html_content()
+    # html_content = generate_html_content()
+    html_content = r"\frac{1}{2}+\sum_{i=1}^{n}\frac{a_i}{i}"
 
-    part = MIMEText(html_content, "html")
+    part = MIMEText(text, 'plain')
     message.attach(part)
 
 
@@ -73,6 +45,37 @@ def send_email():
     finally:
         server.quit()
 
-# send_email()
-latex = "A combination of both text and latex component. Let's see what happens! \(a\neq b\Longleftrightarrow b\neq a\)"
-convert_latex2img(latex)
+# Function to read the list of files that have been processed
+def read_processed_files():
+    try:
+        path = os.path.join(os.getcwd(),'temp','processed_files.txt')
+        with open(path, 'r') as file:
+            return file.read().splitlines()
+    except FileNotFoundError:
+        return []
+
+# Function to write the list of processed files back to disk
+def write_processed_files(processed_files):
+    path = os.path.join(os.getcwd(),'temp','processed_files.txt')
+    with open(path, 'w',encoding='utf-8') as file:
+        file.write('\n'.join(processed_files))
+
+def process_and_send_emails():
+    processed_files = read_processed_files()
+    qa_path = os.path.join(os.getcwd(), 'question_answers')
+    files = [file for file in os.listdir(qa_path) if file.endswith('.txt') and file not in processed_files]
+    content = ''
+    if files:
+        selected_files = random.sample(files, min(FILES_PER_EMAIL, len(files)))
+        for file in selected_files:
+            with open(os.path.join('question_answers', file), 'r') as f:
+                content += f.read()
+                processed_files.append(file)
+            content+='\n'
+
+        send_email(content)
+        print(content)
+        write_processed_files(processed_files)
+
+if __name__ == '__main__':
+    process_and_send_emails()
