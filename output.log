@@ -1,44 +1,11 @@
 dict_keys(['[1library', '\ufeffalgebraic-number-theory', 'main_notes', 'modern-ml-algo', '\ufeffreal analysis'])
-Email sent successfully!
-**Question 1**: When using scaled dot product attention within neural networks, if the dimensions of the query and the key differ, how can this dimensional discrepancy be managed?
-**Answer 1**: This discrepancy can be managed by replacing \( q^T k \) with \( q^T M k \) where \( M \) is a suitably chosen matrix to handle the translation between the different dimensional spaces of the query and the key.
-
-**Question 2**: What is the primary purpose of using a matrix \( M \) when dealing with mismatched dimensions in query and key vectors within scaled dot product attention mechanisms?
-**Answer 2**: The matrix \( M \) is used to translate between the differing dimensional spaces of the query and key vectors, making it possible to perform the dot product even when their original dimensions do not match. This enables effective dimension matching and facilitates appropriate attention calculations.
-Question: When dealing with sequences in data such as documents or patient hospital stays, why can it be incorrect to assume that each data point within the sequence is independent of the others?
-Answer: Because each element in the sequence can influence subsequent elements, meaning the sequence's future state often depends heavily on its past states. For instance, the medicine a patient receives on a specific day in a hospital may be determined by their cumulated health developments over previous days.
-
-Question: What is the implication of modeling data points in sequences under the assumption that they are independently sampled from the same underlying distribution?
-Answer: This assumption can lead to misleading or incorrect models because it fails to capture the inherent dependencies between sequential data points. Sequence modeling, such as in recurrent neural networks (RNNs), must allow for these dependencies to make accurate predictions based on sequence history.
-**Question 1:**  
-What does it mean for the discriminant of one integral basis to be a multiple of another, and what does this imply about their respective bases?
-
-**Answer 1:**  
-If the discriminant \( \Delta\{ω_1',...,ω_n'\} \) of one integral basis is a multiple of the discriminant \( \Delta\{ω_1,...,ω_n\} \) of another, this implies that each basis can be expressed as an integral linear combination of the other, ultimately leading to the equality \( \Delta\{ω_1',...,ω_n'\} = \pm \Delta\{ω_1,...,ω_n\} \), indicating that both sets indeed form integral bases.
-
----
-
-**Question 2:**
-In number field \( K = Q(√d) \) with \( d \) square-free and \( d ≡ 1 \mod 4 \), what is an example of an integral basis and how is the discriminant calculated for this basis?
-
-**Answer 2:**  
-An integral basis for \( K = Q(√d) \) under these conditions is {1, (1 + \( √d \))/2}. The discriminant of this basis is calculated as \( d \) through the determinant of matrix formed by evaluating this basis under different embeddings.
-
----
-
-**Question 3:**
-How might one compute the discriminant of a number field when given a specific primitive element \( γ \) and its minimal polynomial?
-
-**Answer 3:**  
-To compute the discriminant when given a primitive element \( γ \) and its minimal polynomial, one applies the formula \( Δ\{1,γ,...,γ^{n-1}\} = (-1)^{n(n-1)/2}NK/Q(f'(γ)) \), where \( f'(γ)
-Question: What is the primary challenge mentioned in the text regarding estimating autoregressive models when the number of inputs varies with each example?
-Answer: The primary challenge mentioned is that each example in autoregressive modeling based on historical data has a different number of features due to the varying amount of data available as time progresses.
-
-Question: Describe how language models employ the Markov condition to simplify computations according to the text.
-Answer: Language models often leverage the Markov condition by assuming that future states (or words in language modeling) are conditionally independent of past states given some recent history. This allows for more efficient computations, as it limits the extent of history considered for predicting future states, thereby simplifying the model and reducing computational overhead. This approach proceeds as if data satisfies this Markov condition, even if it is only approximately true.
-**Question 1**: What is a primary advantage of using k-fold cross validation instead of hold-out cross validation in data-scarce scenarios?
-**Answer 1**: K-fold cross validation holds out less data each time, allowing more efficient use of limited data to assess model performance, as compared to hold-out cross validation which sets aside a larger portion of the dataset as the validation set.
-
-**Question 2**: How does the leave-one-out method differ from the k-fold method in terms of data utilization, and what is its potential benefit in certain scenarios?
-**Answer 2**: The leave-one-out method involves holding out one training example at a time and using the rest for training, thus leaving out as little data as possible and maximizing data utilization. This can be particularly beneficial in extremely data-scarce scenarios where preserving every data point for training becomes crucial.
-
+Failed to send email. Error: [WinError 10060] A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond
+Traceback (most recent call last):
+  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 87, in <module>
+    process_and_send_emails()
+  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 82, in process_and_send_emails
+    send_email(content)
+  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 46, in send_email
+    server.quit()
+    ^^^^^^
+UnboundLocalError: cannot access local variable 'server' where it is not associated with a value

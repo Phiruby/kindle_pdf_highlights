@@ -16,7 +16,7 @@ load_dotenv()
 EMAIL = os.getenv("SENDER_MAIL")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 
-FILES_PER_EMAIL = 5
+FILES_PER_EMAIL = 2 # FILES_PER_EMAIL * 2 questions per email
 
 def send_email(text):
     sender_email = EMAIL
