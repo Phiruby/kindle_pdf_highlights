@@ -1,11 +1,29 @@
 dict_keys(['[1library', '\ufeffalgebraic-number-theory', 'main_notes', 'modern-ml-algo', '\ufeffreal analysis'])
-Failed to send email. Error: [WinError 10060] A connection attempt failed because the connected party did not properly respond after a period of time, or established connection failed because connected host has failed to respond
-Traceback (most recent call last):
-  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 87, in <module>
-    process_and_send_emails()
-  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 82, in process_and_send_emails
-    send_email(content)
-  File "C:\Users\viloh\OneDrive\Documents\kindle_pdf_highlights_extractor\email_questions.py", line 46, in send_email
-    server.quit()
-    ^^^^^^
-UnboundLocalError: cannot access local variable 'server' where it is not associated with a value
+Failed to send email. Error: (535, b'5.7.8 Username and Password not accepted. For more information, go to\n5.7.8  https://support.google.com/mail/?p=BadCredentials 6a1803df08f44-6c340ca65besm18522966d6.121 - gsmtp')
+Question: What is the primary disadvantage of using hold-out cross validation discussed in the context of data efficiency?
+Answer: The primary disadvantage of using hold-out cross validation is that it "wastes" about 30% of the data, which can be particularly problematic in scenarios where data is scarce, as it reduces the amount of data available for training the models.
+
+Question: How does k-fold cross validation differ from simple or hold-out cross validation in terms of data usage during model training?
+Answer: In k-fold cross validation, the data is divided into k disjoint subsets, and for each model evaluation, one subset is held out while the model is trained on the rest. This method holds out less data at each iteration compared to hold-out cross validation, where typically 30% of the data is withheld from training.
+**Question 1:**  
+What does it mean for the discriminant of one integral basis to be a multiple of another, and what does this imply about their respective bases?
+
+**Answer 1:**  
+If the discriminant \( \Delta\{ω_1',...,ω_n'\} \) of one integral basis is a multiple of the discriminant \( \Delta\{ω_1,...,ω_n\} \) of another, this implies that each basis can be expressed as an integral linear combination of the other, ultimately leading to the equality \( \Delta\{ω_1',...,ω_n'\} = \pm \Delta\{ω_1,...,ω_n\} \), indicating that both sets indeed form integral bases.
+
+---
+
+**Question 2:**
+In number field \( K = Q(√d) \) with \( d \) square-free and \( d ≡ 1 \mod 4 \), what is an example of an integral basis and how is the discriminant calculated for this basis?
+
+**Answer 2:**  
+An integral basis for \( K = Q(√d) \) under these conditions is {1, (1 + \( √d \))/2}. The discriminant of this basis is calculated as \( d \) through the determinant of matrix formed by evaluating this basis under different embeddings.
+
+---
+
+**Question 3:**
+How might one compute the discriminant of a number field when given a specific primitive element \( γ \) and its minimal polynomial?
+
+**Answer 3:**  
+To compute the discriminant when given a primitive element \( γ \) and its minimal polynomial, one applies the formula \( Δ\{1,γ,...,γ^{n-1}\} = (-1)^{n(n-1)/2}NK/Q(f'(γ)) \), where \( f'(γ)
+
