@@ -4,7 +4,11 @@
         "simple cross validation",
         "-fold cross validation",
         ".",
-        "frequentist"
+        "frequentist",
+        "choice of optimizer does not only afect minimizing the training loss, but also imposes implicit regularization and afects the generalization of the model",
+        "A conjecture (that can be proven in certain simplifed case) is that stochasticity in the optimization process help the optimizer to fnd fatter global minima (global minima where the curvature of the loss is small), and fat global minima tend to give more Lipschitz models and better generalization.",
+        "Note that \u03c0\u2217 has the interesting property that it is the optimal policy for all states s.Specifcally, it is not the case that if we were starting in some state s then there\u2019d be some optimal policy for that state, and if we were starting in some other state s0 then there\u2019d be some other policy that\u2019s optimal policy for s0. The same policy \u03c0\u2217 attains the maximum in Equation (15.1) for all states s. This means that we can use the same policy \u03c0\u2217 no matter what the initial state of our MDP is.",
+        "In the frst, we can frst compute the new values for V (s) for every state s, and then overwrite all the old values with the new values. This is called a synchronous update. In this case, the algorithm can be viewed as implementing a \\Bellman backup operator\" that takes a current estimate of the value function, and maps it to a new estimate.(See homework problem for details. ) Alternatively, we can also perform asynchronous updates.Here, we would loop over the states (in some order), updating the values one at a time"
     ],
     "modern-ml-algo": [
         "Ht",
@@ -24,7 +28,16 @@
         "we tokenize text into characters rather than words and consider a character-level language model.",
         "clip the gradients forcing the resulting \u201cclipped\u201d gradients to take smaller values",
         "In it, eigenvalues smaller than 1 vanish and eigenvalues larger than 1 diverge. This is numerically unstable, which manifests itself in the form of vanishing and exploding gradients",
-        "easily by replacing q\u22a4k with q\u22a4Mk where M is a matrix suitably chosen for translating between both spaces."
+        "easily by replacing q\u22a4k with q\u22a4Mk where M is a matrix suitably chosen for translating between both spaces.",
+        "we often assume that while the specifc values of xt might change, the dynamics according to which each subsequent observation is generated given the previous observations do not",
+        "Whenever we can throw away the history beyond the previous \u03c4 steps without any loss in predictive power, we say that the sequence satisfes a Markov condition, i.e. , that the future is conditionally independent of the past, given the recent history. When \u03c4 = 1, we say that the data is characterized by a frst-order Markov model, and when \u03c4 = k, we say that the data is characterized by a kth-order Markov model",
+        "Gradient clipping means that we are not always following the true gradient and it is hard to reason analytically about the possible side efects. However, it is a very useful hack, and is widely adopted in RNN implementations in most deep learning frameworks",
+        "However, this is very slow and gradients can blow up, since subtle changes in the initial conditions can potentially afect the outcome a lot. That is, we could see things similar to the butterfy efect, where minimal changes in the initial conditions lead to disproportionate changes in the outcome",
+        "It follows from the defnition of \u03bet that E[zt] = @ht/@wh",
+        "gradient clipping heuristic. Despite the efcacy of this hack, it leaves open the problem of vanishing gradients",
+        "Reset gates help capture short-term dependencies in sequences. \u2022 Update gates help capture long-term dependencies in sequences",
+        "For instance, we can design a non-diferentiable attention model that can be trained using reinforcement learning methods",
+        "While quite innocuous in its description, this Bahdanau attention mechanism has arguably turned into one of the most infuential ideas of the past decade in deep learning, giving rise"
     ],
     "[1library": [
         "The IETF standards documents are called requests for comments (RFCs)",
@@ -94,7 +107,27 @@
         "Through the use of Content Distribution Networks (CDNs), Web caches are increasingly playing an important role in the Internet. A CDN company installs many geographically distributed caches throughout the Internet",
         "the copy of an object residing in the cache may be stale. In other words, the object housed in the Web server may have been modified since the copy was cached at the client.",
         "304 Not Modified in",
-        "The most striking difference is that FTP uses two parallel TCP connections to transfer a file, a control connection and a data connection"
+        "The most striking difference is that FTP uses two parallel TCP connections to transfer a file, a control connection and a data connection",
+        "there are many types of communication links, which are made up of different types of physical media, including coaxial cable, copper wire, optical fiber, and radio spectrum. Different links can transmit data at different rates, with the transmission rate of a link measured in bits/second",
+        "Figure 1.6 A hybrid fiber-coaxial access network",
+        "In particular, every packet sent by the head end travels downstream on every link to every home and every packet sent by a home travels on the upstream channel to the head end.",
+        "In particular, every packet sent by the head end travels downstream on every link to every home and every packet sent by a home travels on the upstream channel to the head end",
+        "active optical networks (AONs) and passive optical networks (PONs)",
+        "Environmental considerations determine path loss and shadow fading (which decrease the signal strength as the signal travels over a distance and around/through obstructing objects), multipath fading (due to signal reflection off of interfering objects), and interference (due to other transmissions and electromagnetic signals",
+        "communication satellite links two or more Earth-based microwave transmitter/ receivers, known as ground stations. The satellite receives transmissions on one frequency band, regenerates the signal using a repeater (discussed below), and transmits the signal on another frequency",
+        "Between source and destination, each packet travels through communication links and packet switches (for which there are two predominant types, routers and linklayer switches)",
+        "Figure 1.13 A simple circuit-switched network consisting of four switches and four links",
+        "With FDM, the frequency spectrum of a link is divided up among the connections established across the link",
+        "packet suffers from several types of delays at each node along the path. The most important of these delays are the nodal processing delay, queuing delay, transmission delay, and propagation delay; together, these delays accumulate to give a total nodal delay",
+        "application layer is where network applications and their application-layer protocols reside. The Internet\u2019s application layer includes many protocols, such as the HTTP protocol (which provides for Web document request and transfer), SMTP",
+        "The session layer provides for delimiting and synchronization of data exchange, including the means to build a checkpointing and recovery scheme.",
+        "Vulnerability attack. This involves sending a few well-crafted messages to a vulnerable application or operating system running on a targeted host",
+        "As shown in this figure, a socket is the interface between the application layer and the transport layer within a host. It is also referred to as the Application Programming Interface (API)",
+        "In addition to knowing the address of the host to which a message is destined, the sending process must also identify the receiving process (more specifically, the receiving socket) running in the host. This information is needed because in general a host could be running many network applications. A destination port number serves this purpose",
+        "If a particular client asks for the same object twice in a period of a few seconds, the server does not respond by saying that it just served the object to the client; instead, the server resends the object, as it has completely forgotten what it did earlier. Because an HTTP server maintains no information about the clients, HTTP is said to be a stateless protocol",
+        "When this client-server interaction is taking place over TCP, the application developer needs to make an important decision\u2013\u2013should each request/response pair be sent over a separate TCP connection, or should all of the requests and their corresponding responses be sent over the same TCP connection? In the former approach, the application is said to use non-persistent connections; and in the latter approach, persistent connections.",
+        "When Susan\u2019s browser receives the HTTP response message, it sees the Setcookie: header. The browser then appends a line to the special cookie file that it manages. This line includes the hostname of the server and the identification number in the Set-cookie: header",
+        "Thus, with FTP, the control connection remains open throughout the duration of the user session, but a new data connection is created for each file transferred within a session (that is, the data connections are non-persistent)"
     ],
     "algebraic-number-theory": [
         "The set of all algebraic integers forms a ring.",
@@ -102,6 +135,19 @@
         "Suppose that \u03b1 is a root of some polynomial f (X) \u2208 Q[X]. If m(X) is the minimal polynomial of \u03b1, then m(X)| f (X)",
         "If \u03b1 is algebraic, Q[\u03b1] = Q(\u03b1), and so every element of Q(\u03b1) can be written as a polynomial in \u03b1",
         "Suppose that\u03b1 is algebraic. Then the degree of the extension[Q(\u03b1) : Q] is the same as the degree of the minimal polynomial of \u03b1 over Q",
-        "Suppose that f (X) \u2208 Q[X] is an irreducible polynomial. Then it has distinct roots in C"
+        "Suppose that f (X) \u2208 Q[X] is an irreducible polynomial. Then it has distinct roots in C",
+        "Let \u03b1 be a complex number. Then the following are equivalent: 1. \u03b1 is algebraic; 2. the feld extension Q(\u03b1)/Q is of fnite degree",
+        "feld K is a number feld if it is a fnite extension of Q. The degree of K is the degree of the feld extension [K : Q], i.e., the dimension of K as a vector space over Q.",
+        "Recall that the characteristic of a feld is 0 if 1 + 1 + \u00b7 \u00b7 \u00b7 + 1 is never equal to 0, and is p if p is the smallest number such that 1 + 1 + \u00b7 \u00b7 \u00b7 + 1 = 0",
+        "Primitive Element) Suppose K \u2208 L is a fnite extension of felds of characteristic 0 (e.g., number felds). Then L = K(\u03b3) for some element \u03b3 \u2208 L",
+        "Let \u03b1 be an algebraic number. We say that \u03b1 is an algebraic integer if the minimal polynomial of \u03b1 over Q has coeffcients in Z.",
+        "Suppose that \u03b1 satisfes any monic polynomial with coeffcients in Z. Then \u03b1 is an algebraic integer",
+        "Recall that a module M over a ring R is like a vector space over a feld; we should be able to add two elements of M together to get another element of M, and to multiply an element of M by an element of R, in such a way that the same rules are satisfed as for vector spaces.",
+        "Let \u03b1 \u2208 C. The following are equivalent: 1. \u03b1 is an algebraic integer; 2. Z[\u03b1] is a fnitely generated module over Z.",
+        "Let R be a ring containing Z. If R is fnitely generated as a Zmodule, then every element \u03b1 \u2208 R is the root of a monic polynomial with coeffcients in Z.",
+        "Suppose that \u03b1 and \u03b2 are algebraic integers. Then Z[\u03b1, \u03b2] is fnitely generated as a Z-module",
+        "Let K be a number feld. Then the integers in K are ZK = {\u03b1 \u2208 K | \u03b1 is an algebraic integer}.",
+        "Suppose R is a subring of a number feld K , and that R is fnitely generated as a Z-module. Then R \u2208 ZK",
+        "Suppose that d is a squarefree integer (i.e. , not divisible by the square of any prime). Then 1. If d \u223c 2 or 3 (mod 4), then the ring of integers in Q(\u2265d) is Z[\u2265d] = {a + b\u2265d | a,b \u2208 Z}.2. If d \u223c 1 (mod 4), then the ring of integers in Q(\u2265d) is Z[\u03c1d] = {a + b\u03c1d | a,b \u2208 Z} where \u03c1d = 1+2 \u2265d ."
     ]
 }

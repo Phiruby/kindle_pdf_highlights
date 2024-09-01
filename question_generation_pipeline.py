@@ -8,11 +8,13 @@ from PyPDF2 import PdfReader
 import unicodedata
 import re
 from config import OFFSETS_BY_BOOK_NAME
+from fuzzywuzzy import fuzz
+from fuzzywuzzy import process
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 # Define your list of relevant books
 # If empty, all books will be processed
-RELEVANT_BOOKS = ["algebraic-number-theory", "\ufeffalgebraic-number-theory"]  # Replace with your book titles
+RELEVANT_BOOKS = []  # Replace with your book titles
 
 # Define the paths to your Kindle clippings and books directory
 CLIPPINGS_FILE_PATH = "D:\\documents\\My Clippings.txt"
@@ -153,6 +155,8 @@ def extract_context_from_epub(file_path, highlight_text):
                 end_index = min(len(content), content.index(highlight_text) + len(highlight_text) + 500)
                 context = content[start_index:end_index]
                 break
+    print(context)
+    print("EXTRACTING CONTEXT FROM EPUB FOR HIGHLIGHT: ", highlight_text)
     return context
 
 def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
@@ -193,29 +197,22 @@ def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
         if page_index < 0 or page_index >= len(reader.pages):
             print(f"Page number {page_number} is out of range in the PDF.")
             return context
-
-        # page = reader.pages[page_index]
-        # print(page_index)
-        # print(file_path)
-        # page_text = page.extract_text()  # Extract the text from the page
-
-        print(repr(highlight_text).replace(" ","").lower())
-        # print(clean_text(highlight_text.replace(" ", "").lower()))
-        print("------")
+ 
         if page_text:
             page_text = page_text.replace("\n", "")
-            print(repr(page_text).replace(" ","").lower())
-            print("#############")
-            # Check if the cleaned highlight is in the cleaned page text
-            if highlight_text.replace(" ", "").lower() in page_text.replace(" ", "").lower():
+            
+            page_text_cleaned = page_text.replace("\n", "").replace(" ", "").lower()
 
-                # If it is, find the start and end indices of the highlight in the original text
-                original_start_index = page_text.replace(" ", "").lower().index(highlight_text.replace(" ", "").lower())
+            # check if strings are approximately equal
+            # sometimes the strings in highlights are different than the pdf (eg: "field" in pdf -> "feld" in highlight)
+            if fuzz.partial_ratio(highlight_text.replace(" ", "").lower(), page_text_cleaned) > 80:
+                print("PASSED PARTIAL RATION")
 
-                start_index = max(0, original_start_index - 500)
-                end_index = min(len(page_text), original_start_index + len(highlight_text) + 500)
+                match_start = process.extractOne(highlight_text, [page_text_cleaned], scorer=fuzz.partial_ratio)[1]
 
-                # Extract the context from the page text
+                # Extract the context around the found match
+                start_index = max(0, match_start - 2000)
+                end_index = min(len(page_text), match_start + len(highlight_text) + 2000)
                 context = page_text[start_index:end_index]
 
                 # Clean the context using GPT-4
@@ -225,7 +222,6 @@ def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
                 cache[highlight_text] = cleaned_context
                 save_cache(cache)
 
-                print("FOUND CONTEXT! NOW RETURNING CLEANED CONTEXT")
                 return cleaned_context
 
     print("DID NOT FIND CONTEXT FOR THE ABOVE HIGHLIGHT!")
@@ -278,22 +274,23 @@ def process_books():
         for entry in book_highlights:
             highlight = entry["highlight"]
             page_number = entry["page_number"]
+            context = None 
 
-            if highlight in processed_highlights[book_title]:
-                print(f"Skipping already processed highlight: {highlight}")
-                continue
+            # if highlight in processed_highlights[book_title]:
+            #     print(f"Skipping already processed highlight: {highlight}")
+            #     continue
 
             if book_file_path.endswith(".epub"):
                 print("Skipping .epub for now")
-                # context = extract_context_from_epub(book_file_path, highlight)
+                context = extract_context_from_epub(book_file_path, highlight)
             elif book_file_path.endswith(".pdf"):
-                context = extract_context_from_pdf(book_file_path, highlight, page_number, book_title)
-                print(context)
+                # context = extract_context_from_pdf(book_file_path, highlight, page_number, book_title)
+                print("SKIPPING PDF FOR NOW")
             else:
                 print(f"Unsupported file format for book: {book_title}")
                 continue
 
-            if context:
+            if context is not None:
                 # questions = generate_questions(context, highlight)
                 # print(f"Generated questions for highlight: {highlight}\n{questions}\n")
 
