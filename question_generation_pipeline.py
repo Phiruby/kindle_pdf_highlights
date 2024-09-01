@@ -1,23 +1,70 @@
 import os
 import json
 import openai
+from openai import OpenAI
 from ebooklib import epub
 import ebooklib
 from PyPDF2 import PdfReader
 import unicodedata
 import re
+from config import OFFSETS_BY_BOOK_NAME
 
-# Set your OpenAI API key here
-openai.api_key = os.environ.get("OPEN_AI_KEY")
-
+openai.api_key = os.getenv("OPENAI_API_KEY")
 # Define your list of relevant books
 # If empty, all books will be processed
-RELEVANT_BOOKS = []  # Replace with your book titles
+RELEVANT_BOOKS = ["algebraic-number-theory", "\ufeffalgebraic-number-theory"]  # Replace with your book titles
 
 # Define the paths to your Kindle clippings and books directory
 CLIPPINGS_FILE_PATH = "D:\\documents\\My Clippings.txt"
 BOOKS_DIRECTORY = "D:\documents\Downloads\Items01"  # Path to the directory containing your books
 PROCESSED_HIGHLIGHTS_FILE = "processed_highlights.json"
+CACHE_FILE = "highlight_cache.json" #context around highlights are stored here
+
+print(os.getenv("OPENAI_API_KEY"))
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def load_cache():
+    """Load the cache from the file."""
+    if os.path.exists(CACHE_FILE):
+        with open(CACHE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return {}
+
+def save_cache(cache):
+    """Save the cache to the file."""
+    with open(CACHE_FILE, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, indent=4)
+
+def clean_text_with_gpt(context):
+    """
+    Cleans the extracted context using GPT-4.
+    
+    Args:
+        context (str): The extracted text from the PDF.
+
+    Returns:
+        str: The cleaned text.
+    """
+    # prompt = f"Please clean the following text, fixing formatting issues, and making it clear and readable:\n\n{context}"
+    prompt = f"""
+            The following consists of extracted text from a pdf using python. It is very messy. I want you to clean it up. Convert any mathematical expressions into latex and wrap code snippets around markdown blocks.
+            Do not say anything else apart from the cleaned text:
+            \n\n
+            {context}
+            """
+    
+    response = openai_client.chat.completions.create(
+    model="gpt-4o-mini",
+    messages=[
+        {"role": "user", "content": prompt},
+    ]
+    )
+
+    print("CLEANING GPT RESPONSE \n ---------------- \n")
+    print(response)
+    
+    cleaned_text = response.choices[0].message.content
+    return cleaned_text
 
 # Load processed highlights
 def load_processed_highlights():
@@ -108,57 +155,81 @@ def extract_context_from_epub(file_path, highlight_text):
                 break
     return context
 
-def clean_text(text):
+def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
     """
-    Cleans the text by removing extra spaces, newlines, and normalizing the encoding.
-    """
-    text = text.replace('\n', ' ')  # Replace newlines with spaces
-    text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with a single space
-    return text.strip().lower()  # Strip leading/trailing spaces and convert to lowercase
-
-def extract_context_from_pdf(file_path, highlight_text, page_number):
-    """
-    Extracts the context from a specific page in a PDF file around a given highlight
-    by searching for the highlight in the specified page.
+    Extracts the context from a specific page in a PDF file around a given highlight,
+    by searching for the highlight in the specified page and then cleaning the context
+    using GPT-4 before returning it.
 
     Args:
         file_path (str): The path to the PDF file
         highlight_text (str): The highlight text to search for
         page_number (int): The page number to search in
+        book_name (str): The name of the book (used for page offset)
 
     Returns:
-        str: The context around the highlight, or an empty string if the highlight is not found
+        str: The cleaned context around the highlight, or an empty string if the highlight is not found.
     """
+    # Load the cache
+    cache = load_cache()
+    print("EXTRACTING CONTEXT FROM PDF FOR HIGHLIGHT: ", highlight_text)
+
+    # Check if the highlight is already cached
+    if highlight_text in cache:
+        print("Using cached version")
+        return cache[highlight_text]
+
     reader = PdfReader(file_path)  # Read the PDF file
     context = ""  # Initialize the context string
+    highlight_text = highlight_text.replace("\n", "")
 
     # Adjust page_number to be zero-indexed
-    page_index = page_number - 1
+    for page_index in range(len(reader.pages)):
+        page = reader.pages[page_index]
+        page_text = page.extract_text()  # Extract the text from the page
 
-    if page_index < 0 or page_index >= len(reader.pages):
-        print(f"Page number {page_number} is out of range in the PDF.")
-        return context
+        # print(OFFSETS_BY_BOOK_NAME[book_name])
 
-    page = reader.pages[page_index]
-    page_text = page.extract_text()  # Extract the text from the page
+        if page_index < 0 or page_index >= len(reader.pages):
+            print(f"Page number {page_number} is out of range in the PDF.")
+            return context
 
-    if page_text:
-        # Clean the highlight and page text for better matching
-        clean_highlight = clean_text(highlight_text)
-        clean_page_text = clean_text(page_text)
+        # page = reader.pages[page_index]
+        # print(page_index)
+        # print(file_path)
+        # page_text = page.extract_text()  # Extract the text from the page
 
-        # Check if the cleaned highlight is in the cleaned page text
-        if clean_highlight in clean_page_text:
-            # If it is, find the start and end indices of the highlight in the original text
-            original_start_index = page_text.lower().index(clean_highlight)
-            start_index = max(0, original_start_index - 500)
-            end_index = min(len(page_text), original_start_index + len(highlight_text) + 500)
+        print(repr(highlight_text).replace(" ","").lower())
+        # print(clean_text(highlight_text.replace(" ", "").lower()))
+        print("------")
+        if page_text:
+            page_text = page_text.replace("\n", "")
+            print(repr(page_text).replace(" ","").lower())
+            print("#############")
+            # Check if the cleaned highlight is in the cleaned page text
+            if highlight_text.replace(" ", "").lower() in page_text.replace(" ", "").lower():
 
-            # Extract the context from the page text
-            context = page_text[start_index:end_index]
+                # If it is, find the start and end indices of the highlight in the original text
+                original_start_index = page_text.replace(" ", "").lower().index(highlight_text.replace(" ", "").lower())
 
-    return context  # Return the context, or an empty string if the highlight is not found
+                start_index = max(0, original_start_index - 500)
+                end_index = min(len(page_text), original_start_index + len(highlight_text) + 500)
 
+                # Extract the context from the page text
+                context = page_text[start_index:end_index]
+
+                # Clean the context using GPT-4
+                cleaned_context = clean_text_with_gpt(context)
+
+                # Store the cleaned context in the cache
+                cache[highlight_text] = cleaned_context
+                save_cache(cache)
+
+                print("FOUND CONTEXT! NOW RETURNING CLEANED CONTEXT")
+                return cleaned_context
+
+    print("DID NOT FIND CONTEXT FOR THE ABOVE HIGHLIGHT!")
+    return context
 def generate_questions(context, highlight):
     prompt = f"""
     Given the following context from a book, generate a list of questions that could be useful for spaced repetition learning. The questions should focus on testing key concepts, important details, and the significance of the highlighted text.
@@ -198,8 +269,10 @@ def process_books():
             continue
 
         # Ensure the book is in the processed highlights record
-        if book_title not in processed_highlights:
-            processed_highlights[book_title] = []
+        cleaned_book_title = book_title.lstrip('\ufeff')
+        if cleaned_book_title not in processed_highlights:
+            
+            processed_highlights[cleaned_book_title] = []
 
         # Determine the file format and extract context accordingly
         for entry in book_highlights:
@@ -211,9 +284,11 @@ def process_books():
                 continue
 
             if book_file_path.endswith(".epub"):
-                context = extract_context_from_epub(book_file_path, highlight)
+                print("Skipping .epub for now")
+                # context = extract_context_from_epub(book_file_path, highlight)
             elif book_file_path.endswith(".pdf"):
-                context = extract_context_from_pdf(book_file_path, highlight, page_number)
+                context = extract_context_from_pdf(book_file_path, highlight, page_number, book_title)
+                print(context)
             else:
                 print(f"Unsupported file format for book: {book_title}")
                 continue
@@ -223,7 +298,8 @@ def process_books():
                 # print(f"Generated questions for highlight: {highlight}\n{questions}\n")
 
                 # Mark the highlight as processed
-                processed_highlights[book_title].append(highlight)
+                book_title_without_bom = book_title.lstrip('\ufeff')
+                processed_highlights[book_title_without_bom].append(highlight)
 
                 # Save the updated processed highlights
                 save_processed_highlights(processed_highlights)

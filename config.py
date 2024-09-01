@@ -7,8 +7,9 @@ CONTENT_SPLIT_KEY = 'seceihraidufaiusdfhaisdfhaisdufh'
 OFFSETS_BY_BOOK_NAME = {
     '[1library': 27,
     '\ufeffalgebraic-number-theory': 12,
+    'algebraic-number-theory': 12,
     'main_notes': 1,
-    'modern-ml-algo': 41,
+    'modern-ml-algo': 40,
     '\ufeffreal analysis': 12
 }
 print(OFFSETS_BY_BOOK_NAME.keys())
