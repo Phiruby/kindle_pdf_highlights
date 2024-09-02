@@ -1,7 +1,7 @@
 import json
 import openai
 from openai import OpenAI
-
+from config import CACHE_FILE, QUESTION_ANSWER_PAIRS_FILE
 # Load your OpenAI API key
 client = OpenAI()
 
@@ -32,12 +32,12 @@ def generate_question_answer(highlight, context):
     return response.choices[0].message.content.strip()
 
 # Load the highlight cache
-with open('highlight_cache.json', 'r') as file:
+with open(CACHE_FILE, 'r') as file:
     highlight_cache = json.load(file)
 
 # Load the existing question-answer pairs if they exist
 try:
-    with open('generated_qa_pairs.json', 'r') as file:
+    with open(QUESTION_ANSWER_PAIRS_FILE, 'r') as file:
         qa_pairs = json.load(file)
 except FileNotFoundError:
     print("No existing question-answer pairs found. Creating new file.")
@@ -52,5 +52,5 @@ for highlight, context in highlight_cache.items():
     qa_pairs[highlight] = qa_pair
 
 # Optionally, save the generated question-answer pairs to a new JSON file
-with open('generated_qa_pairs.json', 'w') as file:
+with open(QUESTION_ANSWER_PAIRS_FILE, 'w') as file:
     json.dump(qa_pairs, file, indent=4)

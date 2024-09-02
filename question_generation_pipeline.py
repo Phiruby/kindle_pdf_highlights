@@ -7,20 +7,11 @@ import ebooklib
 from PyPDF2 import PdfReader
 import unicodedata
 import re
-from config import OFFSETS_BY_BOOK_NAME
 from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
+from config import RELEVANT_BOOKS, CLIPPINGS_FILE_PATH, BOOKS_DIRECTORY, PROCESSED_HIGHLIGHTS_FILE, CACHE_FILE, HIGHLIGHT_CONTEXT_CHARACTER_WINDOW
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
-# Define your list of relevant books
-# If empty, all books will be processed
-RELEVANT_BOOKS = []  # Replace with your book titles
-
-# Define the paths to your Kindle clippings and books directory
-CLIPPINGS_FILE_PATH = "D:\\documents\\My Clippings.txt"
-BOOKS_DIRECTORY = "D:\documents\Downloads\Items01"  # Path to the directory containing your books
-PROCESSED_HIGHLIGHTS_FILE = "processed_highlights.json"
-CACHE_FILE = "highlight_cache.json" #context around highlights are stored here
 
 print(os.getenv("OPENAI_API_KEY"))
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -211,8 +202,8 @@ def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
                 match_start = process.extractOne(highlight_text, [page_text_cleaned], scorer=fuzz.partial_ratio)[1]
 
                 # Extract the context around the found match
-                start_index = max(0, match_start - 2000)
-                end_index = min(len(page_text), match_start + len(highlight_text) + 2000)
+                start_index = max(0, match_start - HIGHLIGHT_CONTEXT_CHARACTER_WINDOW)
+                end_index = min(len(page_text), match_start + len(highlight_text) + HIGHLIGHT_CONTEXT_CHARACTER_WINDOW)
                 context = page_text[start_index:end_index]
 
                 # Clean the context using GPT-4
