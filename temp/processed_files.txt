@@ -1,2 +1,2 @@
-info_main_notes__130-130 .txt
-info_﻿algebraic-number-theory__53 .txt
+The source end system first transmits the bit, and shortly thereafter the first router in the series receives the bit; the first router then transmits the bit, and shortly thereafter the second router receives the bit; and so on. Thus our bit, when traveling from source to destination, passes through a series of transmitter-receiver pairs. For each transmitter-receiver pair, the bit is sent by propagating electromagnetic waves or optical pulses across a physical medium.|2024-09-02 11:07:15
+As shown in this figure, a socket is the interface between the application layer and the transport layer within a host. It is also referred to as the Application Programming Interface (API)|2024-09-02 11:07:15
