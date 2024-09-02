@@ -134,7 +134,7 @@ def extract_highlights_from_clippings(clippings_file):
 
         # Check if the book is in the relevant books list;
         # If RELEVANT_BOOKS is empty, all books will be processed
-        if any(relevant_book.lower() in book_title.lower() for relevant_book in RELEVANT_BOOKS) or RELEVANT_BOOKS == []:
+        if (any(relevant_book.lower() in book_title.lower() for relevant_book in RELEVANT_BOOKS) or RELEVANT_BOOKS == []) and len(highlight) > 3:
             if book_title not in highlights:
                 highlights[book_title] = []
             highlights[book_title].append({
@@ -226,29 +226,7 @@ def extract_context_from_pdf(file_path, highlight_text, page_number, book_name):
 
     print("DID NOT FIND CONTEXT FOR THE ABOVE HIGHLIGHT!")
     return context
-def generate_questions(context, highlight):
-    prompt = f"""
-    Given the following context from a book, generate a list of questions that could be useful for spaced repetition learning. The questions should focus on testing key concepts, important details, and the significance of the highlighted text.
 
-    Context:
-    {context}
-
-    Highlight:
-    {highlight}
-
-    Please provide 3-5 questions.
-    """
-
-    response = openai.Completion.create(
-        engine="text-davinci-003",
-        prompt=prompt,
-        max_tokens=200,
-        n=1,
-        stop=None,
-        temperature=0.7,
-    )
-
-    return response.choices[0].text.strip()
 
 def process_books():
     processed_highlights = load_processed_highlights()
@@ -282,10 +260,10 @@ def process_books():
 
             if book_file_path.endswith(".epub"):
                 print("Skipping .epub for now")
-                context = extract_context_from_epub(book_file_path, highlight)
+                # context = extract_context_from_epub(book_file_path, highlight)
             elif book_file_path.endswith(".pdf"):
-                # context = extract_context_from_pdf(book_file_path, highlight, page_number, book_title)
-                print("SKIPPING PDF FOR NOW")
+                context = extract_context_from_pdf(book_file_path, highlight, page_number, book_title)
+                # print("SKIPPING PDF FOR NOW")
             else:
                 print(f"Unsupported file format for book: {book_title}")
                 continue

@@ -1,89 +1,56 @@
-from config import get_prompt, OUTPUT_DATA_FOLDER, QUESTION_OUTPUT_FOLDER, CONTENT_SPLIT_KEY
-import os 
-
-from dotenv import load_dotenv, dotenv_values
+import json
+import openai
 from openai import OpenAI
 
-data_path = os.path.join(os.getcwd(), OUTPUT_DATA_FOLDER)
-assert os.path.exists(data_path), "The data storage folder is not found. Please make sure the data is loaded"
-assert len(os.listdir(data_path)) > 0, "No data found inside the storage"
+# Load your OpenAI API key
+client = OpenAI()
 
-load_dotenv()
-OPEN_AI_KEY = os.getenv("OPEN_AI_KEY")
-NUM_QUESTION_PAIRS = 2
-REGEN_QUESTIONS = False #creates questions for ALL highlights from scratch if true
-
-client = OpenAI(api_key = OPEN_AI_KEY)
-
-#make output folder if not there yet
-question_folder_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER)
-if not os.path.exists(question_folder_path):
-    os.mkdir(question_folder_path)
-
-def read_file_and_create_question(filename: str, num_questions: int) -> None:
-    if filename not in os.listdir(data_path):
-        # print(repr(os.listdir(data_path)[-11]))
-        raise Exception(f"Could not find the following in the data: {filename}")
+def generate_question_answer(highlight, context):
+    prompt = f"""
+    Highlight: {highlight}\n
     
-    qa_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER)
-    #if file already has questions created for it
-    if filename in qa_path and not REGEN_QUESTIONS:
-        print(f"The following file already has questions generated: {filename}. Set REGEN_QUESTIONS=True if you want to override these questions")
-        print("Skipping for now")
-        return None
-    file_path = os.path.join(data_path, filename)
-    question_answers = ''
-    with open(file_path, 'rb') as file:
-        file_contents = file.read()
-        file_contents = file_contents.decode('utf-8')  # Assuming UTF-8 encoding
-        # print(type(file_contents))
-        if not file_contents.startswith("HIGHLIGHTED CONTENT"):
-            return None #if it is a note, then we dont want to create question-answer pair
-        #now split to highlighted and text
-        highlight, page_text = file_contents.split(CONTENT_SPLIT_KEY)
-        highlight = highlight[20:] #removes the "HIGHLIGHTED CONTENT:"
+    Context: {context}\n\n
+    """
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role": "system", "content": """You will be given a highlight and context, and you will need to generate 1-3 question
+                 and answer pairs (depending on how many questions are required to cover all the information in the highlight) based 
+            on the provided information. The fewer questions you generate, the better. The questions should be primarily knowledge questions. 
+            For highlights related to math propositions / theorems / corollary, the question and answer pair
+            should be "Prove XYZ" and the answer should be the proof. Do not make questions that rely on the proposition number (for example, I do not memorize each theorem by their numbers).
+            Any code snippets should be wrapped around markdown code blocks; any 
+            math equations should be in latex. 
+            The questions should be in the following format, in markdown format: 
+            # Question:\n ```[Question]```\n # Answer:\n ```[Answer]```."""
+            },
+            {"role": "user", "content": prompt}
+        ],
+    )
+    print(response.choices[0].message.content.strip())
+    return response.choices[0].message.content.strip()
 
-        completion = client.chat.completions.create(
-            model="gpt-4-turbo",
-            messages=[
-                {"role": "user", "content": get_prompt(highlight, page_text, num_questions)}
-            ],
-            frequency_penalty=0.19,
-            temperature = 1,
-            max_tokens = 400
-        )
-        question_answers = completion.choices[0].message.content
-    
-    output_path = os.path.join(os.getcwd(), QUESTION_OUTPUT_FOLDER, filename)
-    with open(output_path, 'w', encoding='utf-8') as file:
-        print(question_answers)
-        file.write(question_answers)
-       
+# Load the highlight cache
+with open('highlight_cache.json', 'r') as file:
+    highlight_cache = json.load(file)
 
-# read_file_and_create_question("info_\ufeffalgebraic-number-theory__53 .txt", NUM_QUESTION_PAIRS)
+# Load the existing question-answer pairs if they exist
+try:
+    with open('generated_qa_pairs.json', 'r') as file:
+        qa_pairs = json.load(file)
+except FileNotFoundError:
+    print("No existing question-answer pairs found. Creating new file.")
+    qa_pairs = {}
 
-'''
-creates question files for all highlights within the books stored in the list books
-params
----
-    books: the list of book (their names)
-'''
+# Iterate through each highlight-context pair and generate question-answer pairs
+for highlight, context in highlight_cache.items():
+    if highlight in qa_pairs:
+        print(f"Skipping already processed highlight: {highlight}")
+        continue
+    qa_pair = generate_question_answer(highlight, context)
+    qa_pairs[highlight] = qa_pair
 
-def create_question_files(books):
-    data_path = os.path.join(os.getcwd(), OUTPUT_DATA_FOLDER)
-    for file in os.listdir(data_path):
-        if file_is_in_list(file, books):
-            print(f"Now creating questions for {file}")
-            read_file_and_create_question(file, NUM_QUESTION_PAIRS)
-
-'''
-checks if any element in file_list is a substring of file
-'''
-def file_is_in_list(file: str, file_list: str):
-    for filos in file_list:
-        if filos in file:
-            return True
-    return False
-
-BOOKS_I_WANT = ["modern-ml-algo", "main_notes"]
-create_question_files(BOOKS_I_WANT)
+# Optionally, save the generated question-answer pairs to a new JSON file
+with open('generated_qa_pairs.json', 'w') as file:
+    json.dump(qa_pairs, file, indent=4)
