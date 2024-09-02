@@ -5,12 +5,12 @@ import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
-from config import QUESTION_ANSWER_PAIRS_FILE, PROCESSED_HIGHLIGHTS_FILE
+from config import QUESTION_ANSWER_PAIRS_FILE, PROCESSED_TEXT_FILE
 
 # Function to read the list of files that have been processed
 def read_processed_files():
     try:
-        with open(PROCESSED_HIGHLIGHTS_FILE, 'r', encoding='utf-8') as file:
+        with open(PROCESSED_TEXT_FILE, 'r', encoding='utf-8') as file:
             return file.read().splitlines()
     except FileNotFoundError:
         return []
@@ -22,7 +22,6 @@ def send_email(content):
     # see https://support.google.com/accounts/answer/185833?hl=en to create app password
     password = os.getenv("EMAIL_PASSWORD")
 
-    print(sender_email, receiver_email, password)
 
     message = MIMEMultipart("alternative")
     message["From"] = sender_email
@@ -59,7 +58,7 @@ def pick_least_recently_sent_questions(qa_pairs, processed_files, num_questions=
     return selected_questions
 
 def write_processed_files(processed_files):
-    path = os.path.join(os.getcwd(),'temp','processed_files.txt')
+    path = PROCESSED_TEXT_FILE
     with open(path, 'w', encoding='utf-8') as file:
         for item in processed_files:
             file.write(f"{item}|{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
