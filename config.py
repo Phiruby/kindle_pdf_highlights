@@ -11,5 +11,3 @@ QUESTION_ANSWER_PAIRS_FILE = "generated_qa_pairs.json" # json file where questio
 PROCESSED_TEXT_FILE = os.path.join(os.getcwd(),'temp','processed_files.txt') # txt file where processed highlights are stored. Used to avoid sending the same highlight multiple times
 # the characters around the highlighted text that are used to provide context for gpt to generate the question
 HIGHLIGHT_CONTEXT_CHARACTER_WINDOW = 2000
-
-
