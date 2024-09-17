@@ -1,13 +1,32 @@
 #!/bin/bash
 
+# Initialize variables
+internal_name=""
+subject_title=""
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --internal_name)
+            internal_name="$2"
+            shift 2
+            ;;
+        --subject_title)
+            subject_title="$2"
+            shift 2
+            ;;
+        *)
+            echo "Unknown parameter: $1"
+            exit 1
+            ;;
+    esac
+done
+
 # Check if both arguments are provided
-if [ $# -ne 2 ]; then
-    echo "Usage: $0 <internal_name> <subject_title>"
+if [ -z "$internal_name" ] || [ -z "$subject_title" ]; then
+    echo "Usage: $0 --internal_name <internal_name> --subject_title <subject_title>"
     exit 1
 fi
-
-internal_name=$1
-subject_title=$2
 
 # Create a new directory for the question set
 mkdir -p "question_sets/$internal_name"

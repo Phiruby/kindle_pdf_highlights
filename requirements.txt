@@ -1,7 +1,6 @@
 annotated-types==0.6.0
 anyio==4.3.0
 appengine-python-standard==1.1.6
-aspose-pdf==24.8.0
 attrs==23.2.0
 beautifulsoup4==4.12.3
 cachetools==5.3.3
