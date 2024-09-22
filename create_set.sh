@@ -37,7 +37,8 @@ cat << EOF > "question_sets/$internal_name/config.json"
     "internal_name": "$internal_name",
     "subject_title": "$subject_title",
     "qa_pairs_file": "generated_qa_pairs.json",
-    "keys_are_question": "true"
+    "keys_are_question": "true",
+    "num_questions": 2
 }
 EOF
 

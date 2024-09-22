@@ -118,6 +118,7 @@ def process_and_send_emails():
             subject_title = config["subject_title"]
             keys_are_questions = config["keys_are_question"]
             qa_pairs_file = os.path.join(set_path, config["qa_pairs_file"])
+            num_questions = config.get("num_questions", 2)  # Default to 2 if not specified
             print(qa_pairs_file)
 
             processed_dict = read_processed_files(internal_name)
@@ -125,7 +126,7 @@ def process_and_send_emails():
             with open(qa_pairs_file, 'r', encoding='utf-8') as file:
                 qa_pairs = json.load(file)
             
-            selected_questions = pick_least_recently_sent_questions(qa_pairs, processed_dict)
+            selected_questions = pick_least_recently_sent_questions(qa_pairs, processed_dict, num_questions)
             
             print(selected_questions)
             content = ''
