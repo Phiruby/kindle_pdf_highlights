@@ -6,6 +6,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from datetime import datetime
 from config import PROCESSED_TEXT_FILE, QUESTION_SETS_DIR
+import importlib
 
 # Function to read the list of files that have been processed
 # def read_processed_files(set_name):
@@ -105,6 +106,15 @@ def render_markdown_latex(content):
 def format_question_in_markdown(question, answer):
     return f"# Question:\n```{question}```\n# Answer:\n```{answer}```"
 
+def get_picking_algorithm(algorithm_name):
+    try:
+        module = importlib.import_module(f"picking_algorithms.{algorithm_name}")
+        return module.pick_questions
+    except ImportError:
+        print(f"Algorithm {algorithm_name} not found. Using least_recently_chosen as default.")
+        from picking_algorithms.least_recently_chosen import pick_questions
+        return pick_questions
+
 def process_and_send_emails():
     question_sets_dir = QUESTION_SETS_DIR
     for set_dir in os.listdir(question_sets_dir):
@@ -118,7 +128,8 @@ def process_and_send_emails():
             subject_title = config["subject_title"]
             keys_are_questions = config["keys_are_question"]
             qa_pairs_file = os.path.join(set_path, config["qa_pairs_file"])
-            num_questions = config.get("num_questions", 2)  # Default to 2 if not specified
+            num_questions = config.get("num_questions", 2)
+            question_algorithm = config.get("question_algorithm", "least_recently_chosen")
             print(qa_pairs_file)
 
             processed_dict = read_processed_files(internal_name)
@@ -126,7 +137,8 @@ def process_and_send_emails():
             with open(qa_pairs_file, 'r', encoding='utf-8') as file:
                 qa_pairs = json.load(file)
             
-            selected_questions = pick_least_recently_sent_questions(qa_pairs, processed_dict, num_questions)
+            picking_algorithm = get_picking_algorithm(question_algorithm)
+            selected_questions = picking_algorithm(qa_pairs, processed_dict, num_questions)
             
             print(selected_questions)
             content = ''
