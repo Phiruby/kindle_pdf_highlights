@@ -30,6 +30,7 @@ fi
 
 # Create a new directory for the question set
 mkdir -p "question_sets/$internal_name"
+mkdir -p "question_sets/$internal_name/images"
 
 # Create a new config file for this set
 cat << EOF > "question_sets/$internal_name/config.json"
