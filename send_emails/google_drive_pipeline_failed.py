@@ -11,7 +11,7 @@ import importlib
 import re
 import base64
 
-to send email
+# send mail
 def send_email(content, subject, image_dict):
     sender_email = os.getenv("SENDER_MAIL")
     receiver_email = os.getenv("RECEIVER_MAIL")
@@ -55,16 +55,16 @@ def reauthenticate_error():
         <body>
             <h1>Reauthentication Required</h1>
             <p>Hey Vilo,</p>
-            <p>Seems as though the google drive pipeline requires reauthentication.</p>
-            <p>Follow the steps below to reauthenticate as you did before:</p>
+            <p>The google drive pipeline requires reauthentication.</p>
+            <p>Your mission, should you choose to accept it, is as follows:</p>
             <ol>
-                <li>Open the application.</li>
+                <li>Open the local login (located in your local Documents/test folder)</li>
                 <li>Follow the prompts to log in with your Google account.</li>
-                <li>Ensure that you grant the necessary permissions.</li>
+                <li>After logging in, copy the token.json file and paste it into the raspberry pigoogle_drive_sync/ directory in the project folder.</li>
             </ol>
-            <p>If you have any questions or need assistance, please do not hesitate to reach out.</p>
-            <p>Thank you for your attention to this matter.</p>
-            <p>Best regards,<br>Your Application Team</p>
+            <p>As always, if you are caught during this mission, the secratary will disavow all knowledge of your actions.</p>
+            <p>Good luck Mr. Rao.</p>
+            <p>Best regards,<br>Vilo</p>
         </body>
     </html>
     """

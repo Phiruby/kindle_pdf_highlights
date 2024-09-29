@@ -12,7 +12,7 @@ from google.auth.transport.requests import Request
 import PIL
 from PIL import Image
 import imghdr
-
+from send_emails.google_drive_pipeline_failed import reauthenticate_error
 # Add the parent directory to sys.path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
@@ -32,6 +32,8 @@ def authenticate():
     if os.path.exists(GOOGLE_TOKEN_PATH):
         creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
+        reauthenticate_error() #sends email to reauthenticate
+        return None 
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
@@ -51,6 +53,8 @@ def authenticate():
 # Function to get Google Drive service
 def get_drive_service():
     creds = authenticate()
+    if creds is None:
+        return None
     return build('drive', 'v3', credentials=creds)
 
 # Function to find the Obsidian Vault folder ID
@@ -148,6 +152,9 @@ def save_results(results):
 # Main pipeline
 def main():
     service = get_drive_service()
+    if service is None:
+        print("Failed to obtain drive service. Exiting...")
+        return
     print("Trying to obtain obsidian vault id...")
     obsidian_vault_id = find_obsidian_vault_id(service)
     print("Obtained obsidian vault id...")
@@ -161,6 +168,13 @@ def main():
         if file['mimeType'] == 'text/markdown':
             content = read_file_content(service, file['id'])
             image_dict = load_referenced_images(service, content, obsidian_vault_id)
+
+            if (len(image_dict.keys()) > 0):
+                print("---------<IMPORTANT>---------")
+                print("Image processing is not implemented yet!")
+                print(f"Skipping file with image references: {file['name']}")
+                print("---------<\IMPORTANT>---------")
+                continue
             
             # Save base64 encoded images to temporary files
             temp_image_files = []
