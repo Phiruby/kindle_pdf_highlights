@@ -11,7 +11,6 @@ from fuzzywuzzy import fuzz
 from fuzzywuzzy import process
 from config import RELEVANT_BOOKS, CLIPPINGS_FILE_PATH, BOOKS_DIRECTORY, PROCESSED_HIGHLIGHTS_FILE, CACHE_FILE, HIGHLIGHT_CONTEXT_CHARACTER_WINDOW
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
 print(os.getenv("OPENAI_API_KEY"))
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
