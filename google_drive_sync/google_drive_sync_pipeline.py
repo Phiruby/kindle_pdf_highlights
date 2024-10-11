@@ -24,7 +24,7 @@ from gpt_prompts.qa_generation import generate_qa_pairs
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_PATH')
 GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH')
-LAST_RUN_FILE = os.path.join(BASE_DIR, 'data', 'last_run.json')
+LAST_RUN_FILE = os.path.join(BASE_DIR, 'last_run.json')
 BASE_QUESTION_SETS_DIR = os.path.join(BASE_DIR, 'question_sets')
 
 # Define scopes - These scopes are necessary to access Google Drive
@@ -33,7 +33,7 @@ SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 AUTH_PORT = os.getenv('AUTH_PORT', 5879)
 
 # Add these new constants
-RELEVANT_FOLDERS = ['machine_learning', 'math']
+RELEVANT_FOLDERS = ['machine_learning']
 
 # Function to handle authentication and store token.json
 def authenticate():
@@ -106,6 +106,7 @@ def traverse_obsidian_vault(service, folder_id, path='', parent_name=''):
             else:
                 file['path'] = file_path
                 file['parent_name'] = file_path.split('/')[0] if '/' in file_path else ''
+                file['immediate_parent_name'] = file_path.split('/')[-2] if '/' in file_path else ''
                 file['modifiedTime'] = file['modifiedTime'][:-1]  # Remove 'Z' from the end
                 results.append(file)
         page_token = response.get('nextPageToken', None)
@@ -238,6 +239,12 @@ def main():
     results = []
     print("Generating QA pairs...")
     for file in files:
+
+        # in this case, this file just acts as a root graph node. Skip it.
+        if file['immediate_parent_name'] in RELEVANT_FOLDERS:
+            print(f"Skipping file: {file['path']} as it acts as a root graph node.")
+            continue 
+
         if file['mimeType'] == 'text/markdown' and should_process_file(file, last_run_time):
             content = read_file_content(service, file['id'])
             image_dict = load_referenced_images(service, content, obsidian_vault_id)
@@ -292,11 +299,13 @@ def main():
                 print(f"Generated QA pairs for file: {file['path']}")
                 organized_qa = organize_qa_pairs(file['path'], qa_pairs)
                 results.append(organized_qa)
+
             else:
                 print(f"No valid QA pairs generated for file: {file['path']}. Skipping.")
         else:
             print(f"Skipping file: {file['path']}")
         
+
     
     print("Generated QA pairs...")
     save_results(results)

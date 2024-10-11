@@ -58,3 +58,10 @@ As you can see in the image, the decision boundary (red line) separates the two 
 ```
 
 Make sure that the image files exist somewhere within the `images` folder or its subdirectories in your question set. If an image is not found, a warning will be printed, and the email will be sent without that image.
+
+## Side dependencies
+
+```
+sudo apt install texlive-latex-base
+sudo apt install imagemagick
+```

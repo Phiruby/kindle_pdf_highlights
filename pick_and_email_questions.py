@@ -10,6 +10,11 @@ from config import PROCESSED_TEXT_FILE, QUESTION_SETS_DIR
 import importlib
 import re
 import base64
+import tempfile
+import subprocess
+import pdf2image
+from io import BytesIO
+from PIL import Image
 
 def read_processed_files(set_name):
     path = f"{PROCESSED_TEXT_FILE}_{set_name}.json"
@@ -38,12 +43,17 @@ def send_email(content, subject, image_dict):
     message.attach(html_part)
 
     # Attach images with Content-ID
-    for cid, image_path in image_dict.items():
-        with open(image_path, 'rb') as img:
-            img_data = img.read()
-        image = MIMEImage(img_data)
+    for cid, image_data in image_dict.items():
+        if isinstance(image_data, str):  # It's a file path
+            with open(image_data, 'rb') as img:
+                img_data = img.read()
+            image = MIMEImage(img_data)
+            image.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_data))
+        else:  # It's binary data
+            image = MIMEImage(image_data)
+            image.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
+        
         image.add_header('Content-ID', f'<{cid}>')
-        image.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_path))
         message.attach(image)
 
     try:
@@ -126,6 +136,92 @@ def find_image_file(images_dir, filename):
             return os.path.join(root, filename)
     return None
 
+def latex_to_image(latex_content):
+    # Prepare the LaTeX document
+    latex_document = r"""
+    \documentclass{article}
+    \usepackage{amsmath}
+    \usepackage{amssymb}
+    \usepackage{color}
+    \usepackage[margin=0.5in]{geometry}
+    \begin{document}
+    \thispagestyle{empty}
+    %s
+    \end{document}
+    """ % latex_content
+
+    # Create temporary files
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tex_file = os.path.join(tmpdir, "latex_content.tex")
+        with open(tex_file, "w") as f:
+            f.write(latex_document)
+
+        # Compile LaTeX to PDF
+        try:
+            result = subprocess.run(["pdflatex", "-output-directory", tmpdir, tex_file], 
+                                    check=True, capture_output=True, text=True)
+            print(f"LaTeX compilation output: {result.stdout}")
+        except subprocess.CalledProcessError as e:
+            print(f"Error during LaTeX compilation: {e}")
+            print(f"LaTeX error output: {e.output}")
+            return None
+
+        # Check if PDF file was created
+        pdf_file = os.path.join(tmpdir, "latex_content.pdf")
+        if not os.path.exists(pdf_file):
+            print(f"PDF file was not created at {pdf_file}")
+            return None
+
+        # Convert PDF to PNG using pdf2image with lower DPI
+        try:
+            images = pdf2image.convert_from_path(pdf_file, dpi=150)
+        except Exception as e:
+            print(f"Error converting PDF to image: {e}")
+            return None
+        
+        # Save the first page as PNG in memory with compression
+        img_buffer = BytesIO()
+        images[0].save(img_buffer, format='PNG', optimize=True, quality=85)
+        
+        # Resize the image if it's too large
+        img = Image.open(img_buffer)
+        max_width = 800  # Set your desired maximum width
+        if img.width > max_width:
+            ratio = max_width / img.width
+            new_height = int(img.height * ratio)
+            img = img.resize((max_width, new_height), Image.LANCZOS)
+            
+            # Save the resized image
+            img_buffer = BytesIO()
+            img.save(img_buffer, format='PNG', optimize=True, quality=85)
+        
+        return img_buffer.getvalue()
+
+def process_latex(content):
+    # Replace '\\' with '\' in the content
+    content = content.replace('\\\\', '\\')
+    
+    # Process inline LaTeX
+    content = re.sub(r'\$(.+?)\$', r'$\1$', content)
+    content = re.sub(r'\\\((.+?)\\\)', r'$\1$', content)
+    
+    # Process display LaTeX
+    content = re.sub(r'\$\$(.+?)\$\$', r'\[\1\]', content, flags=re.DOTALL)
+    content = re.sub(r'\\\[(.+?)\\\]', r'\[\1\]', content, flags=re.DOTALL)
+    
+    return content
+
+def format_question_in_latex(question, answer):
+    return r"""
+    \textbf{Question:}
+    
+    %s
+    
+    \textbf{Answer:}
+    
+    %s
+    """ % (question, answer)
+
 def process_and_send_emails():
     question_sets_dir = QUESTION_SETS_DIR
     for set_dir in os.listdir(question_sets_dir):
@@ -141,6 +237,9 @@ def process_and_send_emails():
             num_questions = config.get("num_questions", 2)
             question_algorithm = config.get("question_algorithm", "least_recently_chosen")
             paused = config.get("paused", "false")
+
+            if internal_name != "machine_learning":
+                continue
 
             if paused == "true":
                 print(f"Paused: {internal_name}")
@@ -159,11 +258,13 @@ def process_and_send_emails():
             print(selected_questions)
             content = ''
             image_dict = {}
-            for question in selected_questions:
+            for i, question in enumerate(selected_questions):
                 current_content = qa_pairs[question]
                 if keys_are_questions == "true":
                     print("Keys are questions")
-                    current_content = format_question_in_markdown(question, qa_pairs[question])
+                    current_content = format_question_in_latex(process_latex(question), process_latex(qa_pairs[question]))
+                else:
+                    current_content = process_latex(current_content)
                 
                 # Process content and prepare images
                 processed_content = ''
@@ -176,12 +277,19 @@ def process_and_send_emails():
                         if full_image_path:
                             cid = f"img_{len(image_dict)}"
                             image_dict[cid] = full_image_path
-                            img_tag = f'<img src="cid:{cid}" alt="{image_filename}">'
-                            processed_content += img_tag
+                            processed_content += f'<img src="cid:{cid}" alt="{image_filename}">'
                         else:
                             print(f"Warning: Image not found: {image_filename}")
                     else:
-                        processed_content += render_markdown_latex(part)
+                        # Generate LaTeX image for text content
+                        latex_image = latex_to_image(part)
+                        if latex_image is not None:
+                            cid = f"latex_img_{i}_{len(image_dict)}"
+                            image_dict[cid] = latex_image
+                            processed_content += f'<img src="cid:{cid}" alt="LaTeX content">'
+                        else:
+                            print(f"Failed to generate LaTeX image for content: {part}")
+                            processed_content += f'<p>Failed to render LaTeX: {part}</p>'
                 
                 content += processed_content + '<br><br>'
             

@@ -20,38 +20,46 @@ def encode_image(image_path):
         print(f"Error processing image {image_path}: {str(e)}. Skipping.")
         return None
 
-def generate_qa_pairs(content, file_name, images=None, model="gpt-4o-mini", num_pairs="3-5"):
+def generate_qa_pairs(content, file_name, images=None, model="gpt-4o", num_pairs="3-5"):
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
 
     SYSTEM_PROMPT = """
-    You will be given a markdown file written in Obsidian (possibly with latex and images). It will contain the topic of the notes in the first line. For each file, generate a
-    question-answer pair in the form of a JSON object with the following schema:
+    You will be given a markdown file written in Obsidian (possibly with LaTeX and images). It will contain the topic of the notes in the last line. Based on this topic, generate a question-answer pair in the form of a JSON object with the following schema:
     {
         "question1": "answer1",
         "question2": "answer2",
         "question3": "answer3",
         ...
     }
-    And nothing else should be included in the response. The questions should cover key ideas, concepts, and details from
-    the notes. This includes equations, definitions, theorems, and important observations. The questions should be related to the topic of the notes (and not generic things that are loosely related to the topic).
-    
-    Do NOT ask questions that are not knowledge-based questions. For example, do not ask questions such as "What does equation X imply about Y?".
-    Rather, ask questions in the form of "What is..." (though not all questions are required to be in this form. This is just an example to clarify that
-    the questions should be knowledge-based).
 
-    The number of questions you create is up to you. The fewer questions, the better. However, they should be diverse and cover all the important ideas in the file. 
+    ### Response Requirements:
+    - Only return the JSON object with the questions and answers. Do not include any extra text.
 
-    The answer should be thorough, as though the user has read the file in the past but has forgotten most of the details. This may include
-    briefly defining technical terms, summarizing key ideas, or explaining the reasoning behind a particular observation.
-    
-    **Make sure to use latex that uses $ instead of \(. Do NOT use \( or \[**. Wrap the required parts in $ latex blocks. !! And add double '\\' before a symbol (so the string can be parsed). But continue to use $ for latex).!!.**
+    ### Question Content:
+    - Focus on **key ideas, concepts, equations, definitions, theorems**, and observations directly related to the topic.
+    - Avoid vague or overly generic questions.
 
-    While generating the questions, DO NOT ASSUME that the user is has read the file recently. So do not generate questions that refer to
-    a theorem or fact by their numbers / labels. Always state the theorem / fact in full while generating the questions. Likewise, 
-    never refer to the specific document or document title. Assume these notes have never been read by the user. Never ask questions such as "What is XYZ as described in the notes?".
-    The reader may have never read the notes before.
+    ### Number of Questions:
+    - Provide as **few questions as possible**, but ensure they cover all critical points.
+
+    ### Answer Requirements:
+    - The answers should be **thorough and detailed**, assuming the user has never read the file before.
+    - Include brief definitions or explanations of technical terms, equations, and reasoning as necessary.
+
+    ### LaTeX Usage:
+    - Use **$ for inline LaTeX** and ensure it can be parsed with **double backslashes (\\\\)** for symbols.
+
+    ### General Instructions:
+    - Avoid referring to specific document titles, theorem numbers, or labels.
+    - For machine learning algorithms, focus on how the algorithms work (mathematically) alongside its implementation.
+        - Avoid asking questions about the definition of a term. Provide the definition in the answer if the answer uses it.
+        - Avoid asking vague questions such as "How do transformers work?". Be more specific such as "What is multi-head attention?". The answers should go into the math.
+        - The answers should be technical and detailed
+    - Avoid asking questions that ask how one thing relates to another. Focus on how the content works.
+    - If you are referencing anything in the notes, make sure to include it in the question or answer (eg: code blocks, equations, etc.)
     """
+
 
     messages = [
         {
