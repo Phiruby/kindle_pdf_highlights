@@ -20,14 +20,44 @@ def encode_image(image_path):
         print(f"Error processing image {image_path}: {str(e)}. Skipping.")
         return None
 
-def generate_qa_pairs(content, images=None, model="gpt-4-vision-preview", num_pairs="3-5"):
+def generate_qa_pairs(content, images=None, model="gpt-4o-mini", num_pairs="3-5"):
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
+
+    SYSTEM_PROMPT = """
+    You will be given a markdown file written in Obsidian (possibly with latex and images). For each file, generate a
+    question-answer pair in the form of a JSON object with the following schema:
+    {
+        "question1": "answer1",
+        "question2": "answer2",
+        "question3": "answer3",
+        ...
+    }
+    And nothing else should be included in the response. The questions should cover key ideas, concepts, and details from
+    the notes. This includes equations, definitions, theorems, and important observations. 
+    
+    Do NOT ask questions that are not knowledge-based questions. For example, do not ask questions such as "What does equation X imply about Y?".
+    Rather, ask questions in the form of "What is..." (though not all questions are required to be in this form. This is just an example to clarify that
+    the questions should be knowledge-based).
+
+    The number of questions you create is up to you. However, they should be diverse and cover all the important ideas in the file. But if you
+    think that the file is not very long, you can generate fewer questions. The fewer questions, the better.
+
+    The answer should be thorough, as though the user has read the file in the past but has forgotten most of the details. This may include
+    briefly defining technical terms, summarizing key ideas, or explaining the reasoning behind a particular observation.
+    
+    Make sure to use latex that uses $ instead of \(. Do NOT use \( or \[. Wrap the required parts in $ latex blocks. And do not add double '\\' before a symbol. Only one is fine, as in overleaf style.
+
+    While generating the questions, DO NOT ASSUME that the user is has read the file recently. So do not generate questions that refer to
+    a theorem or fact by their numbers / labels. Always state the theorem / fact in full while generating the questions. Likewise, 
+    never refer to the specific document or document title. Assume these notes have never been read by the user. Never ask questions such as "What is XYZ as described in the notes?".
+    The reader may have never read the notes before.
+    """
 
     messages = [
         {
             "role": "system",
-            "content": f"Generate {num_pairs} question-answer pairs based on the given content and images if provided."
+            "content": SYSTEM_PROMPT
         },
         {
             "role": "user",
@@ -53,10 +83,7 @@ def generate_qa_pairs(content, images=None, model="gpt-4-vision-preview", num_pa
                 })
                 print(f"Successfully encoded image: {image_path}")
 
-    print(messages)
-    if not images or len(messages[1]["content"]) <= 1:
-        print("No images provided or all image encodings failed")
-        return None
+
     try:
         response = client.chat.completions.create(
             model=model,
@@ -66,12 +93,13 @@ def generate_qa_pairs(content, images=None, model="gpt-4-vision-preview", num_pa
         
         if hasattr(response, 'choices') and len(response.choices) > 0:
             qa_pairs = response.choices[0].message.content
+            print(qa_pairs)
             return qa_pairs
         else:
             raise Exception("Unexpected response format from OpenAI API")
     except Exception as e:
         print(f"Error calling OpenAI API: {str(e)}")
-        raise
+        raise Exception(f"Error calling OpenAI API: {str(e)}")
 
 # Example usage:
 # qa_pairs = generate_qa_pairs("Your content here", images=["path/to/image1.png", "path/to/image2.png"])

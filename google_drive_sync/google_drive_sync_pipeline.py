@@ -4,6 +4,7 @@ import io
 import json
 import re
 import base64
+from datetime import datetime
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseDownload
@@ -12,7 +13,7 @@ from google.auth.transport.requests import Request
 import PIL
 from PIL import Image
 import imghdr
-from send_emails.google_drive_pipeline_failed import reauthenticate_error
+from send_emails.google_drive_pipeline_failed import reauthenticate_error, email_unknown_error
 # Add the parent directory to sys.path
 parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(parent_dir)
@@ -26,14 +27,19 @@ AUTH_PORT = os.getenv('AUTH_PORT', 5879)
 GOOGLE_APPLICATION_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_PATH')
 GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH')
 
+# Add these new constants
+RELEVANT_FOLDERS = ['machine_learning', 'math']
+LAST_RUN_FILE = 'last_run.json'
+
 # Function to handle authentication and store token.json
 def authenticate():
     creds = None
     if os.path.exists(GOOGLE_TOKEN_PATH):
+        print("Found token.json...")
         creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
-        reauthenticate_error() #sends email to reauthenticate
-        return None 
+        reauthenticate_error()
+        return None
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
@@ -44,7 +50,7 @@ def authenticate():
                 SCOPES,
                 redirect_uri='http://localhost'
             )
-            creds = flow.run_local_server(port=AUTH_PORT)
+            creds = flow.run_local_server(port=int(AUTH_PORT))
         print("Received credentials! Now saving to token.json")
         with open(GOOGLE_TOKEN_PATH, 'w') as token:
             token.write(creds.to_json())
@@ -114,10 +120,8 @@ def read_image_file(service, file_id):
 def load_referenced_images(service, content, folder_id):
     image_pattern = r'\[\[(.*?\.(?:png|jpg|jpeg|gif))\]\]'
     image_references = re.findall(image_pattern, content)
-    print("REFERENCES")
-    print(image_references)
     image_dict = {}
-    image_folder_id = find_obsidian_vault_id(service, 'in-text-images')
+    image_folder_id = find_obsidian_vault_id(service, 'images')
     for image_ref in image_references:
         image_name = os.path.basename(image_ref)
         response = service.files().list(
@@ -144,17 +148,71 @@ def organize_qa_pairs(file_path, qa_pairs):
         'qa_pairs': qa_pairs
     }
 
-# Save the results
+# Modified Save the results function
 def save_results(results):
-    with open('obsidian_qa_results.json', 'w') as f:
-        json.dump(results, f, indent=2)
+    base_dir = 'question_sets'
+    os.makedirs(base_dir, exist_ok=True)
 
-# Main pipeline
+    for result in results:
+        question_set = result['question_set']
+        qa_pairs = result['qa_pairs']
+        
+        # Create a directory for the question set
+        set_dir = os.path.join(base_dir, question_set)
+        os.makedirs(set_dir, exist_ok=True)
+        
+        # Path for the generated_qa_pairs.json file
+        qa_file_path = os.path.join(set_dir, 'generated_qa_pairs.json')
+        
+        # Load existing Q&A pairs if the file exists
+        existing_qa_pairs = {}
+        if os.path.exists(qa_file_path):
+            with open(qa_file_path, 'r') as f:
+                existing_qa_pairs = json.load(f)
+        
+        # Update existing Q&A pairs with new ones
+        existing_qa_pairs.update(qa_pairs)
+        
+        # Save the updated Q&A pairs
+        with open(qa_file_path, 'w') as f:
+            json.dump(existing_qa_pairs, f, indent=2)
+        
+        print(f"Saved Q&A pairs for {question_set} in {qa_file_path}")
+
+    print("All results have been saved.")
+
+# New function to load the last run time
+def load_last_run_time():
+    if os.path.exists(LAST_RUN_FILE):
+        with open(LAST_RUN_FILE, 'r') as f:
+            data = json.load(f)
+            return datetime.fromisoformat(data['last_run'])
+    return datetime.min
+
+# New function to save the current run time
+def save_current_run_time():
+    with open(LAST_RUN_FILE, 'w') as f:
+        json.dump({'last_run': datetime.now().isoformat()}, f)
+
+# Modified function to check if a file should be processed
+def should_process_file(service, file, last_run_time):
+    file_metadata = service.files().get(fileId=file['id'], fields='modifiedTime, parents').execute()
+    modified_time = datetime.fromisoformat(file_metadata['modifiedTime'][:-1])  # Remove 'Z' from the end
+    
+    if modified_time <= last_run_time:
+        return False
+    
+    parent_id = file_metadata['parents'][0]
+    parent_folder = service.files().get(fileId=parent_id, fields='name').execute()
+    return parent_folder['name'] in RELEVANT_FOLDERS
+
+# Modified main pipeline
 def main():
     service = get_drive_service()
     if service is None:
         print("Failed to obtain drive service. Exiting...")
         return
+    
     print("Trying to obtain obsidian vault id...")
     obsidian_vault_id = find_obsidian_vault_id(service)
     print("Obtained obsidian vault id...")
@@ -162,59 +220,38 @@ def main():
     files = traverse_obsidian_vault(service, obsidian_vault_id)
     print("Traversed obsidian vault...")
     
+    last_run_time = load_last_run_time()
     results = []
     print("Generating QA pairs...")
     for file in files:
-        if file['mimeType'] == 'text/markdown':
+        if file['mimeType'] == 'text/markdown' and should_process_file(service, file, last_run_time):
             content = read_file_content(service, file['id'])
             image_dict = load_referenced_images(service, content, obsidian_vault_id)
 
-            if (len(image_dict.keys()) > 0):
+            if len(image_dict.keys()) > 0:
                 print("---------<IMPORTANT>---------")
                 print("Image processing is not implemented yet!")
-                print(f"Skipping file with image references: {file['name']}")
+                print(f"Processing file: {file['name']} without images...")
                 print("---------<\IMPORTANT>---------")
-                continue
             
-            # Save base64 encoded images to temporary files
-            temp_image_files = []
-            for image_name, image_content in image_dict.items():
-                temp_file_path = f"temp_{image_name}"
-                with open(temp_file_path, "wb") as temp_file:
-                    temp_file.write(base64.b64decode(image_content))
-                
-                try:
-                    with Image.open(temp_file_path) as img:
-                        img = img.convert('RGBA')  # Convert to RGBA to preserve transparency
-                        file_name = os.path.splitext(image_name)[0].replace(" ", "")
-                        png_path = f"temp_{file_name}.png"
-                        img.save(png_path, "PNG")
-                        temp_image_files.append(png_path)
-                    os.remove(temp_file_path)  # Remove the original temporary file
-                except Exception as e:
-                    print(os.path.exists(temp_file_path))
-                    print(f"Error processing image {temp_file_path}: {str(e)}. Skipping.")
-                    # os.remove(temp_file_path)
+            # Generate QA pairs with content (images are not processed for now)
+            qa_pairs_str = generate_qa_pairs(content, images=[])
             
-            # Replace image references in content with [IMAGE_WORD] tags
-            for image_name in image_dict.keys():
-                content = content.replace(f'[[{image_name}]]', f'[IMAGE_WORD]({os.path.splitext(image_name)[0]}.png)')
-            
-            # Generate QA pairs with content and images
-            qa_pairs = generate_qa_pairs(content, images=temp_image_files)
-            
-            # Clean up temporary image files
-            for temp_file in temp_image_files:
-                os.remove(temp_file)
-            
-            if qa_pairs:
+            try:
+                qa_pairs = json.loads(qa_pairs_str)
                 organized_qa = organize_qa_pairs(file['name'], qa_pairs)
                 results.append(organized_qa)
-            else:
-                print(f"No QA pairs generated for file: {file['name']}")
-        break # for testing
+            except json.JSONDecodeError:
+                print(f"Error decoding JSON for file: {file['name']}. Skipping.")
+        else:
+            print(f"Skipping file: {file['name']}")
+    
     print("Generated QA pairs...")
     save_results(results)
+    save_current_run_time()
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        email_unknown_error(str(e))

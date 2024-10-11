@@ -50,7 +50,7 @@ def reauthenticate_error():
     Sends an email consisting of the content to reauthenticate
     '''
     subject = "Reauthentication Required"
-    content = """
+    content = f"""
     <html>
         <body>
             <h1>Reauthentication Required</h1>
@@ -63,8 +63,25 @@ def reauthenticate_error():
                 <li>After logging in, copy the token.json file and paste it into the raspberry pigoogle_drive_sync/ directory in the project folder.</li>
             </ol>
             <p>As always, if you are caught during this mission, the secratary will disavow all knowledge of your actions.</p>
-            <p>Good luck Mr. Rao.</p>
+            <p>Good luck Vilo.</p>
             <p>Best regards,<br>Vilo</p>
+            
+        </body>
+    </html>
+    """
+    image_dict = {}  # Assuming no images are needed for this email
+    send_email(content, subject, image_dict)
+
+def email_unknown_error(error_message: str):
+    subject = "Unknown Error"
+    content = f"""
+    <html>
+        <body>
+            <h1>Unknown Error</h1>
+            <p>Hey Vilo,</p>
+            <p>An unknown error occurred in the google drive pipeline.</p>
+            <p>Here is the error message: {error_message}</p>
+            <p>Please fix the issue and run the pipeline again.</p>
         </body>
     </html>
     """
