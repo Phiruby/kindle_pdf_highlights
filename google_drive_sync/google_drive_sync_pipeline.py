@@ -20,17 +20,20 @@ sys.path.append(parent_dir)
 
 from gpt_prompts.qa_generation import generate_qa_pairs
 
+# Define absolute paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+GOOGLE_APPLICATION_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_PATH')
+GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH')
+LAST_RUN_FILE = os.path.join(BASE_DIR, 'data', 'last_run.json')
+BASE_QUESTION_SETS_DIR = os.path.join(BASE_DIR, 'question_sets')
+
 # Define scopes - These scopes are necessary to access Google Drive
 SCOPES = ['https://www.googleapis.com/auth/drive.readonly']
 
 AUTH_PORT = os.getenv('AUTH_PORT', 5879)
-GOOGLE_APPLICATION_CREDENTIALS_PATH = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_PATH')
-GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH')
 
 # Add these new constants
 RELEVANT_FOLDERS = ['machine_learning', 'math']
-LAST_RUN_FILE = 'last_run.json'
-BASE_QUESTION_SETS_DIR = '/home/viloh/Documents/kindle_pdf_highlights/question_sets'
 
 # Function to handle authentication and store token.json
 def authenticate():
@@ -38,24 +41,32 @@ def authenticate():
     if os.path.exists(GOOGLE_TOKEN_PATH):
         print("Found token.json...")
         creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_PATH, SCOPES)
+    
     if not creds or not creds.valid:
-        
-        reauthenticate_error()
-        return None
         if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
+            print("Token expired. Refreshing...")
+            try:
+                creds.refresh(Request())
+                print("Token refreshed successfully.")
+            except Exception as e:
+                print(f"Error refreshing token: {str(e)}")
+                print("Initiating reauthentication...")
+                reauthenticate_error()
+                return None
         else:
-            print(GOOGLE_APPLICATION_CREDENTIALS_PATH)
-            print(os.path.exists(GOOGLE_APPLICATION_CREDENTIALS_PATH))
+            print("No valid credentials found. Initiating new authentication flow...")
             flow = InstalledAppFlow.from_client_secrets_file(
                 GOOGLE_APPLICATION_CREDENTIALS_PATH,
                 SCOPES,
                 redirect_uri='http://localhost'
             )
             creds = flow.run_local_server(port=int(AUTH_PORT))
-        print("Received credentials! Now saving to token.json")
+        
+        # Save the credentials for the next run
         with open(GOOGLE_TOKEN_PATH, 'w') as token:
             token.write(creds.to_json())
+        print("New credentials saved to token.json")
+    
     return creds
 
 # Function to get Google Drive service
@@ -264,6 +275,7 @@ def main():
                 json_str = json_str.replace('\\"', '"')
                 
                 # Replace single backslashes with double backslashes but leave existing double backslashes unchanged
+                # so the string can be parsed.
                 json_str = re.sub(r'(?<!\\)\\(?!\\)', r'\\\\', json_str)
                 
                 # Try parsing again
@@ -285,11 +297,10 @@ def main():
         else:
             print(f"Skipping file: {file['path']}")
         
-        break  # Remove this line when you want to process all files
     
     print("Generated QA pairs...")
     save_results(results)
-    # save_current_run_time()
+    save_current_run_time()
 
 if __name__ == '__main__':
     try:
