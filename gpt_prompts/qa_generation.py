@@ -20,12 +20,12 @@ def encode_image(image_path):
         print(f"Error processing image {image_path}: {str(e)}. Skipping.")
         return None
 
-def generate_qa_pairs(content, images=None, model="gpt-4o-mini", num_pairs="3-5"):
+def generate_qa_pairs(content, file_name, images=None, model="gpt-4o-mini", num_pairs="3-5"):
     api_key = os.getenv("OPENAI_API_KEY")
     client = OpenAI(api_key=api_key)
 
     SYSTEM_PROMPT = """
-    You will be given a markdown file written in Obsidian (possibly with latex and images). For each file, generate a
+    You will be given a markdown file written in Obsidian (possibly with latex and images). It will contain the topic of the notes in the first line. For each file, generate a
     question-answer pair in the form of a JSON object with the following schema:
     {
         "question1": "answer1",
@@ -34,19 +34,18 @@ def generate_qa_pairs(content, images=None, model="gpt-4o-mini", num_pairs="3-5"
         ...
     }
     And nothing else should be included in the response. The questions should cover key ideas, concepts, and details from
-    the notes. This includes equations, definitions, theorems, and important observations. 
+    the notes. This includes equations, definitions, theorems, and important observations. The questions should be related to the topic of the notes (and not generic things that are loosely related to the topic).
     
     Do NOT ask questions that are not knowledge-based questions. For example, do not ask questions such as "What does equation X imply about Y?".
     Rather, ask questions in the form of "What is..." (though not all questions are required to be in this form. This is just an example to clarify that
     the questions should be knowledge-based).
 
-    The number of questions you create is up to you. However, they should be diverse and cover all the important ideas in the file. But if you
-    think that the file is not very long, you can generate fewer questions. The fewer questions, the better.
+    The number of questions you create is up to you. The fewer questions, the better. However, they should be diverse and cover all the important ideas in the file. 
 
     The answer should be thorough, as though the user has read the file in the past but has forgotten most of the details. This may include
     briefly defining technical terms, summarizing key ideas, or explaining the reasoning behind a particular observation.
     
-    Make sure to use latex that uses $ instead of \(. Do NOT use \( or \[. Wrap the required parts in $ latex blocks. And do not add double '\\' before a symbol. Only one is fine, as in overleaf style.
+    **Make sure to use latex that uses $ instead of \(. Do NOT use \( or \[**. Wrap the required parts in $ latex blocks. !! And add double '\\' before a symbol (so the string can be parsed). But continue to use $ for latex).!!.**
 
     While generating the questions, DO NOT ASSUME that the user is has read the file recently. So do not generate questions that refer to
     a theorem or fact by their numbers / labels. Always state the theorem / fact in full while generating the questions. Likewise, 
@@ -64,7 +63,7 @@ def generate_qa_pairs(content, images=None, model="gpt-4o-mini", num_pairs="3-5"
             "content": [
                 {
                     "type": "text",
-                    "text": content
+                    "text": f"The topic of the notes is: {file_name}\n\n{content}"
                 }
             ]
         }
@@ -88,12 +87,12 @@ def generate_qa_pairs(content, images=None, model="gpt-4o-mini", num_pairs="3-5"
         response = client.chat.completions.create(
             model=model,
             messages=messages,
-            max_tokens=1000
+            max_tokens=8000
         )
         
         if hasattr(response, 'choices') and len(response.choices) > 0:
             qa_pairs = response.choices[0].message.content
-            print(qa_pairs)
+            # print(qa_pairs)
             return qa_pairs
         else:
             raise Exception("Unexpected response format from OpenAI API")

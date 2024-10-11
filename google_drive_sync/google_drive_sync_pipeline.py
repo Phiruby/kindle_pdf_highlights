@@ -30,6 +30,7 @@ GOOGLE_TOKEN_PATH = os.getenv('GOOGLE_TOKEN_PATH')
 # Add these new constants
 RELEVANT_FOLDERS = ['machine_learning', 'math']
 LAST_RUN_FILE = 'last_run.json'
+BASE_QUESTION_SETS_DIR = '/home/viloh/Documents/kindle_pdf_highlights/question_sets'
 
 # Function to handle authentication and store token.json
 def authenticate():
@@ -38,6 +39,7 @@ def authenticate():
         print("Found token.json...")
         creds = Credentials.from_authorized_user_file(GOOGLE_TOKEN_PATH, SCOPES)
     if not creds or not creds.valid:
+        
         reauthenticate_error()
         return None
         if creds and creds.expired and creds.refresh_token:
@@ -76,20 +78,24 @@ def find_obsidian_vault_id(service, folder_name='Obsidian Vault'):
     return items[0]['id']
 
 # Traverse the Obsidian Vault directory
-def traverse_obsidian_vault(service, folder_id):
+def traverse_obsidian_vault(service, folder_id, path='', parent_name=''):
     results = []
     page_token = None
     while True:
         response = service.files().list(
             q=f"'{folder_id}' in parents and trashed=false",
             spaces='drive',
-            fields='nextPageToken, files(id, name, mimeType)',
+            fields='nextPageToken, files(id, name, mimeType, modifiedTime)',
             pageToken=page_token
         ).execute()
         for file in response.get('files', []):
+            file_path = os.path.join(path, file['name'])
             if file['mimeType'] == 'application/vnd.google-apps.folder':
-                results.extend(traverse_obsidian_vault(service, file['id']))
+                results.extend(traverse_obsidian_vault(service, file['id'], file_path, file['name']))
             else:
+                file['path'] = file_path
+                file['parent_name'] = file_path.split('/')[0] if '/' in file_path else ''
+                file['modifiedTime'] = file['modifiedTime'][:-1]  # Remove 'Z' from the end
                 results.append(file)
         page_token = response.get('nextPageToken', None)
         if page_token is None:
@@ -142,7 +148,7 @@ def load_referenced_images(service, content, folder_id):
 # Organize Q&A pairs into sets
 def organize_qa_pairs(file_path, qa_pairs):
     parts = file_path.split('/')
-    question_set = parts[1] if len(parts) > 1 else 'General'
+    question_set = parts[0] if len(parts) > 1 else 'General'
     return {
         'question_set': question_set,
         'qa_pairs': qa_pairs
@@ -150,7 +156,7 @@ def organize_qa_pairs(file_path, qa_pairs):
 
 # Modified Save the results function
 def save_results(results):
-    base_dir = 'question_sets'
+    base_dir = BASE_QUESTION_SETS_DIR
     os.makedirs(base_dir, exist_ok=True)
 
     for result in results:
@@ -195,16 +201,13 @@ def save_current_run_time():
         json.dump({'last_run': datetime.now().isoformat()}, f)
 
 # Modified function to check if a file should be processed
-def should_process_file(service, file, last_run_time):
-    file_metadata = service.files().get(fileId=file['id'], fields='modifiedTime, parents').execute()
-    modified_time = datetime.fromisoformat(file_metadata['modifiedTime'][:-1])  # Remove 'Z' from the end
+def should_process_file(file, last_run_time):
+    modified_time = datetime.fromisoformat(file['modifiedTime'])
     
     if modified_time <= last_run_time:
         return False
     
-    parent_id = file_metadata['parents'][0]
-    parent_folder = service.files().get(fileId=parent_id, fields='name').execute()
-    return parent_folder['name'] in RELEVANT_FOLDERS
+    return file['parent_name'] in RELEVANT_FOLDERS
 
 # Modified main pipeline
 def main():
@@ -224,31 +227,69 @@ def main():
     results = []
     print("Generating QA pairs...")
     for file in files:
-        if file['mimeType'] == 'text/markdown' and should_process_file(service, file, last_run_time):
+        if file['mimeType'] == 'text/markdown' and should_process_file(file, last_run_time):
             content = read_file_content(service, file['id'])
             image_dict = load_referenced_images(service, content, obsidian_vault_id)
 
             if len(image_dict.keys()) > 0:
                 print("---------<IMPORTANT>---------")
                 print("Image processing is not implemented yet!")
-                print(f"Processing file: {file['name']} without images...")
+                print(f"Processing file: {file['path']} without images...")
                 print("---------<\IMPORTANT>---------")
             
             # Generate QA pairs with content (images are not processed for now)
-            qa_pairs_str = generate_qa_pairs(content, images=[])
+            qa_pairs_str = generate_qa_pairs(content, file['name'], images=[])
             
+            print("Raw QA pairs string:")
+            print(qa_pairs_str)
+            print("==========================")
+
+            # Try to find and parse the JSON part of the string
+            json_str = qa_pairs_str
+            start_idx = qa_pairs_str.find('{')
+            end_idx = qa_pairs_str.rfind('}')
+            if start_idx != -1 and end_idx != -1:
+                json_str = qa_pairs_str[start_idx:end_idx+1]
+
             try:
-                qa_pairs = json.loads(qa_pairs_str)
-                organized_qa = organize_qa_pairs(file['name'], qa_pairs)
+                qa_pairs = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                print(f"Error decoding JSON for file: {file['path']}. Error: {str(e)}")
+                print("Attempting to clean and parse the JSON string...")
+                
+                # Remove any potential leading/trailing whitespace or quotes
+                json_str = json_str.strip().strip('"').strip("'")
+                
+                # Replace any escaped quotes with regular quotes
+                json_str = json_str.replace('\\"', '"')
+                
+                # Replace single backslashes with double backslashes but leave existing double backslashes unchanged
+                json_str = re.sub(r'(?<!\\)\\(?!\\)', r'\\\\', json_str)
+                
+                # Try parsing again
+                try:
+                    qa_pairs = json.loads(json_str)
+                except json.JSONDecodeError:
+                    print(f"Failed to parse JSON for file: {file['path']}. Skipping.")
+                    qa_pairs = {}
+
+            print("Parsed QA pairs:")
+            print(json.dumps(qa_pairs, indent=2))
+            
+            if qa_pairs:
+                print(f"Generated QA pairs for file: {file['path']}")
+                organized_qa = organize_qa_pairs(file['path'], qa_pairs)
                 results.append(organized_qa)
-            except json.JSONDecodeError:
-                print(f"Error decoding JSON for file: {file['name']}. Skipping.")
+            else:
+                print(f"No valid QA pairs generated for file: {file['path']}. Skipping.")
         else:
-            print(f"Skipping file: {file['name']}")
+            print(f"Skipping file: {file['path']}")
+        
+        break  # Remove this line when you want to process all files
     
     print("Generated QA pairs...")
     save_results(results)
-    save_current_run_time()
+    # save_current_run_time()
 
 if __name__ == '__main__':
     try:
