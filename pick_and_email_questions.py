@@ -15,6 +15,9 @@ import subprocess
 import pdf2image
 from io import BytesIO
 from PIL import Image
+import html
+import matplotlib.pyplot as plt
+import io
 
 def read_processed_files(set_name):
     path = f"{PROCESSED_TEXT_FILE}_{set_name}.json"
@@ -137,65 +140,17 @@ def find_image_file(images_dir, filename):
     return None
 
 def latex_to_image(latex_content):
-    # Prepare the LaTeX document
-    latex_document = r"""
-    \documentclass{article}
-    \usepackage{amsmath}
-    \usepackage{amssymb}
-    \usepackage{color}
-    \usepackage[margin=0.5in]{geometry}
-    \begin{document}
-    \thispagestyle{empty}
-    %s
-    \end{document}
-    """ % latex_content
-
-    # Create temporary files
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tex_file = os.path.join(tmpdir, "latex_content.tex")
-        with open(tex_file, "w") as f:
-            f.write(latex_document)
-
-        # Compile LaTeX to PDF
-        try:
-            result = subprocess.run(["pdflatex", "-output-directory", tmpdir, tex_file], 
-                                    check=True, capture_output=True, text=True)
-            print(f"LaTeX compilation output: {result.stdout}")
-        except subprocess.CalledProcessError as e:
-            print(f"Error during LaTeX compilation: {e}")
-            print(f"LaTeX error output: {e.output}")
-            return None
-
-        # Check if PDF file was created
-        pdf_file = os.path.join(tmpdir, "latex_content.pdf")
-        if not os.path.exists(pdf_file):
-            print(f"PDF file was not created at {pdf_file}")
-            return None
-
-        # Convert PDF to PNG using pdf2image with lower DPI
-        try:
-            images = pdf2image.convert_from_path(pdf_file, dpi=150)
-        except Exception as e:
-            print(f"Error converting PDF to image: {e}")
-            return None
-        
-        # Save the first page as PNG in memory with compression
-        img_buffer = BytesIO()
-        images[0].save(img_buffer, format='PNG', optimize=True, quality=85)
-        
-        # Resize the image if it's too large
-        img = Image.open(img_buffer)
-        max_width = 800  # Set your desired maximum width
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), Image.LANCZOS)
-            
-            # Save the resized image
-            img_buffer = BytesIO()
-            img.save(img_buffer, format='PNG', optimize=True, quality=85)
-        
-        return img_buffer.getvalue()
+    plt.figure(figsize=(10, 10))
+    plt.axis('off')
+    plt.text(0.5, 0.5, latex_content, size=12, ha='center', va='center', wrap=True)
+    
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', pad_inches=0.1, dpi=300)
+    img_buffer.seek(0)
+    
+    plt.close()
+    
+    return img_buffer.getvalue()
 
 def process_latex(content):
     # Replace '\\' with '\' in the content
@@ -213,14 +168,14 @@ def process_latex(content):
 
 def format_question_in_latex(question, answer):
     return r"""
-    \textbf{Question:}
+\textbf{Question:}
+    \n\n
+%s
     
-    %s
-    
-    \textbf{Answer:}
-    
-    %s
-    """ % (question, answer)
+\textbf{Answer:}
+ \n\n   
+%s
+""" % (question, answer)
 
 def process_and_send_emails():
     question_sets_dir = QUESTION_SETS_DIR
@@ -258,16 +213,25 @@ def process_and_send_emails():
             print(selected_questions)
             content = ''
             image_dict = {}
+            
             for i, question in enumerate(selected_questions):
                 current_content = qa_pairs[question]
                 if keys_are_questions == "true":
-                    print("Keys are questions")
-                    current_content = format_question_in_latex(process_latex(question), process_latex(qa_pairs[question]))
+                    print(f"Processing question: {question}")
+                    print(f"Answer: {qa_pairs[question]}")
+                    latex_content = f"Question: {question}\n\nAnswer: {qa_pairs[question]}"
                 else:
-                    current_content = process_latex(current_content)
-                
-                # Process content and prepare images
-                processed_content = ''
+                    latex_content = current_content
+
+                latex_image = latex_to_image(latex_content)
+                if latex_image is not None:
+                    cid = f"latex_img_{i}"
+                    image_dict[cid] = latex_image
+                    content += f'<img src="cid:{cid}" alt="LaTeX content"><br><br>'
+                else:
+                    content += f'<pre>{html.escape(latex_content)}</pre><br><br>'
+
+                # Process [IMAGE_WORD] tags
                 parts = re.split(r'(\[IMAGE_WORD\]\(.*?\))', current_content)
                 for part in parts:
                     if part.startswith('[IMAGE_WORD]'):
@@ -277,21 +241,9 @@ def process_and_send_emails():
                         if full_image_path:
                             cid = f"img_{len(image_dict)}"
                             image_dict[cid] = full_image_path
-                            processed_content += f'<img src="cid:{cid}" alt="{image_filename}">'
+                            content += f'<img src="cid:{cid}" alt="{image_filename}"><br><br>'
                         else:
                             print(f"Warning: Image not found: {image_filename}")
-                    else:
-                        # Generate LaTeX image for text content
-                        latex_image = latex_to_image(part)
-                        if latex_image is not None:
-                            cid = f"latex_img_{i}_{len(image_dict)}"
-                            image_dict[cid] = latex_image
-                            processed_content += f'<img src="cid:{cid}" alt="LaTeX content">'
-                        else:
-                            print(f"Failed to generate LaTeX image for content: {part}")
-                            processed_content += f'<p>Failed to render LaTeX: {part}</p>'
-                
-                content += processed_content + '<br><br>'
             
             send_email(content, f"Question Digest: {subject_title}", image_dict)
             write_processed_files(selected_questions, internal_name)
