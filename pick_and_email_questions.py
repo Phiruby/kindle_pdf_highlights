@@ -204,9 +204,6 @@ def process_and_send_emails():
             question_algorithm = config.get("question_algorithm", "least_recently_chosen")
             paused = config.get("paused", "false")
 
-            if internal_name != "machine_learning":
-                continue
-
             if paused == "true":
                 print(f"Paused: {internal_name}")
                 continue
