@@ -142,16 +142,45 @@ def latex_to_image(latex_content):
     plt.figure(figsize=(10, 10))
     plt.axis('off')
 
+    # Define custom LaTeX-like commands with a preceding space
+    def custom_latex_commands(content):
+        content = re.sub(r'\\inner\{(.+?)\}\{(.+?)\}', r' \\langle \1, \2 \\rangle', content)
+        content = re.sub(r'\\norm\{(.+?)\}', r' \\|\1\\|', content)
+        content = re.sub(r'\\complex', r' \\mathbb{C}', content)
+        content = re.sub(r'\\reals', r' \\mathbb{R}', content)
+        content = re.sub(r'\\matrixset\{(.+?)\}\{(.+?)\}', r' M_{\1}(\2)', content)
+        return content
+
+    # Handle LaTeX environments like align*, equation*, etc.
+    def handle_environments(content):
+        # Convert \begin{align*}...\end{align*} to a display math environment
+        content = re.sub(
+            r'\\begin\{align\*\}(.*?)\\end\{align\*\}', 
+            lambda m: f'\\[\n{m.group(1)}\n\\]', 
+            content, flags=re.DOTALL
+        )
+        # Convert \begin{equation*}...\end{equation*} to a display math environment
+        content = re.sub(
+            r'\\begin\{equation\*\}(.*?)\\end\{equation\*\}', 
+            lambda m: f'\\[\n{m.group(1)}\n\\]', 
+            content, flags=re.DOTALL
+        )
+        return content
+
     def split_long_equation(match):
         eq = match.group(1)
         if len(eq) > 50:  # Adjust this threshold as needed
             parts = eq.split(',')
             return '$ ' + ' $\n$ '.join(parts) + ' $'
         return f'${eq}$'
+
+    latex_content = custom_latex_commands(latex_content) # add custom commands
+    latex_content = handle_environments(latex_content)
     # matplotlib breaks for some reason if there are double dollar signs
     latex_content = re.sub(r'\$\$(.*?)\$\$', lambda m: f'\n${m.group(1)}$\n', latex_content, flags=re.DOTALL)
 
-    latex_content = re.sub(r'\$(.+?)\$', split_long_equation, latex_content)
+    # latex_content = re.sub(r'\$(.+?)\$', split_long_equation, latex_content)
+
     
     plt.text(0.5, 0.5, latex_content, size=12, ha='center', va='center', wrap=True)
     
@@ -203,6 +232,9 @@ def process_and_send_emails():
             num_questions = config.get("num_questions", 2)
             question_algorithm = config.get("question_algorithm", "least_recently_chosen")
             paused = config.get("paused", "false")
+
+            if internal_name != 'lin_alg':
+                continue
 
             if paused == "true":
                 print(f"Paused: {internal_name}")
