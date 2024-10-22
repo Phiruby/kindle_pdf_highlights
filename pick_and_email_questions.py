@@ -12,7 +12,6 @@ import re
 import base64
 import tempfile
 import subprocess
-import pdf2image
 from io import BytesIO
 from PIL import Image
 import html
@@ -142,6 +141,18 @@ def find_image_file(images_dir, filename):
 def latex_to_image(latex_content):
     plt.figure(figsize=(10, 10))
     plt.axis('off')
+
+    def split_long_equation(match):
+        eq = match.group(1)
+        if len(eq) > 50:  # Adjust this threshold as needed
+            parts = eq.split(',')
+            return '$ ' + ' $\n$ '.join(parts) + ' $'
+        return f'${eq}$'
+    # matplotlib breaks for some reason if there are double dollar signs
+    latex_content = re.sub(r'\$\$(.*?)\$\$', lambda m: f'\n${m.group(1)}$\n', latex_content, flags=re.DOTALL)
+
+    latex_content = re.sub(r'\$(.+?)\$', split_long_equation, latex_content)
+    
     plt.text(0.5, 0.5, latex_content, size=12, ha='center', va='center', wrap=True)
     
     img_buffer = io.BytesIO()
