@@ -73,7 +73,7 @@ def pick_least_recently_sent_questions(qa_pairs, processed_dict, num_questions=2
     # Separate never-sent questions and sent questions
     never_sent = [q for q in qa_pairs.keys() if q not in processed_dict]
     sent_questions = [q for q in qa_pairs.keys() if q in processed_dict]
-    
+	    
     # Sort sent questions by timestamp
     sorted_sent = sorted(sent_questions, key=lambda q: processed_dict[q])
     
@@ -144,7 +144,7 @@ def latex_to_image(latex_content):
 
     # Define custom LaTeX-like commands with a preceding space
     def custom_latex_commands(content):
-        content = re.sub(r'\\inner\{(.+?)\}\{(.+?)\}', r' \\langle \1, \2 \\rangle', content)
+        content = re.sub(r'\\inner\{(.+?)\}\{(.+?)\}', r' \\langle \1, \2 \\rangle ', content)
         content = re.sub(r'\\norm\{(.+?)\}', r' \\|\1\\|', content)
         content = re.sub(r'\\complex', r' \\mathbb{C}', content)
         content = re.sub(r'\\reals', r' \\mathbb{R}', content)
