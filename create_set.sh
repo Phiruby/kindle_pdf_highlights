@@ -30,6 +30,7 @@ fi
 
 # Create a new directory for the question set
 mkdir -p "question_sets/$internal_name"
+mkdir -p "question_sets/$internal_name/images"
 
 # Create a new config file for this set
 cat << EOF > "question_sets/$internal_name/config.json"
@@ -37,7 +38,8 @@ cat << EOF > "question_sets/$internal_name/config.json"
     "internal_name": "$internal_name",
     "subject_title": "$subject_title",
     "qa_pairs_file": "generated_qa_pairs.json",
-    "keys_are_question": "true"
+    "keys_are_question": "true",
+    "num_questions": 2
 }
 EOF
 

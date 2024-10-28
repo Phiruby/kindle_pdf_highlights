@@ -34,3 +34,34 @@ python pick_and_email_questions.py
 ```
 
 This will send an email to the address specified in the .env file with the questions and answers.
+
+# Image Attachments
+
+You can include images in your questions and answers. To add an image, use the following syntax in your question or answer text:
+
+```
+[IMAGE_WORD](image_filename.jpg)
+```
+
+The `image_filename.jpg` should be the name of the image file located anywhere within the `images` folder or its subdirectories in your question set. The system will search for the image file, attach it to the email, and replace the tag with an inline image in the email content.
+
+For example, if you have an image file `question_sets/machine_learning/images/diagrams/decision_boundary.png`, you can reference it in your question or answer like this:
+
+```
+What is a decision boundary in machine learning?
+
+A decision boundary is the line or surface that separates different classes in a classification problem. Here's an example:
+
+[IMAGE_WORD](decision_boundary.png)
+
+As you can see in the image, the decision boundary (red line) separates the two classes (blue and green points).
+```
+
+Make sure that the image files exist somewhere within the `images` folder or its subdirectories in your question set. If an image is not found, a warning will be printed, and the email will be sent without that image.
+
+## Side dependencies
+
+```
+sudo apt install texlive-latex-base
+sudo apt install imagemagick
+```

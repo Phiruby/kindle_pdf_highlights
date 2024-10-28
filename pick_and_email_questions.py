@@ -4,17 +4,20 @@ import random
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 from datetime import datetime
 from config import PROCESSED_TEXT_FILE, QUESTION_SETS_DIR
+import importlib
+import re
+import base64
+import tempfile
+import subprocess
+from io import BytesIO
+from PIL import Image
+import html
+import matplotlib.pyplot as plt
+import io
 
-# Function to read the list of files that have been processed
-# def read_processed_files(set_name):
-#     processed_file = f"{PROCESSED_TEXT_FILE}_{set_name}"
-#     try:
-#         with open(processed_file, 'r', encoding='utf-8') as file:
-#             return file.read().splitlines()
-#     except FileNotFoundError:
-#         return []
 def read_processed_files(set_name):
     path = f"{PROCESSED_TEXT_FILE}_{set_name}.json"
     try:
@@ -27,18 +30,33 @@ def read_processed_files(set_name):
         return {}
 
 # Function to send email
-def send_email(content, subject):
+def send_email(content, subject, image_dict):
     sender_email = os.getenv("SENDER_MAIL")
     receiver_email = os.getenv("RECEIVER_MAIL")
     password = os.getenv("EMAIL_PASSWORD")
 
-    message = MIMEMultipart("alternative")
+    message = MIMEMultipart("related")
     message["From"] = sender_email
     message["To"] = receiver_email
     message["Subject"] = subject
 
-    part = MIMEText(content, 'html')
-    message.attach(part)
+    # Attach the HTML content
+    html_part = MIMEText(content, 'html')
+    message.attach(html_part)
+
+    # Attach images with Content-ID
+    for cid, image_data in image_dict.items():
+        if isinstance(image_data, str):  # It's a file path
+            with open(image_data, 'rb') as img:
+                img_data = img.read()
+            image = MIMEImage(img_data)
+            image.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_data))
+        else:  # It's binary data
+            image = MIMEImage(image_data)
+            image.add_header('Content-Disposition', 'inline', filename=f'{cid}.png')
+        
+        image.add_header('Content-ID', f'<{cid}>')
+        message.attach(image)
 
     try:
         server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
@@ -105,6 +123,100 @@ def render_markdown_latex(content):
 def format_question_in_markdown(question, answer):
     return f"# Question:\n```{question}```\n# Answer:\n```{answer}```"
 
+def get_picking_algorithm(algorithm_name):
+    try:
+        module = importlib.import_module(f"picking_algorithms.{algorithm_name}")
+        return module.pick_questions
+    except ImportError:
+        print(f"Algorithm {algorithm_name} not found. Using least_recently_chosen as default.")
+        from picking_algorithms.least_recently_chosen import pick_questions
+        return pick_questions
+
+def find_image_file(images_dir, filename):
+    for root, dirs, files in os.walk(images_dir):
+        if filename in files:
+            return os.path.join(root, filename)
+    return None
+
+def latex_to_image(latex_content):
+    plt.figure(figsize=(10, 10))
+    plt.axis('off')
+
+    # Define custom LaTeX-like commands with a preceding space
+    def custom_latex_commands(content):
+        content = re.sub(r'\\inner\{(.+?)\}\{(.+?)\}', r' \\langle \1, \2 \\rangle', content)
+        content = re.sub(r'\\norm\{(.+?)\}', r' \\|\1\\|', content)
+        content = re.sub(r'\\complex', r' \\mathbb{C}', content)
+        content = re.sub(r'\\reals', r' \\mathbb{R}', content)
+        content = re.sub(r'\\matrixset\{(.+?)\}\{(.+?)\}', r' M_{\1}(\2)', content)
+        return content
+
+    # Handle LaTeX environments like align*, equation*, etc.
+    def handle_environments(content):
+        # Convert \begin{align*}...\end{align*} to a display math environment
+        content = re.sub(
+            r'\\begin\{align\*\}(.*?)\\end\{align\*\}', 
+            lambda m: f'\\[\n{m.group(1)}\n\\]', 
+            content, flags=re.DOTALL
+        )
+        # Convert \begin{equation*}...\end{equation*} to a display math environment
+        content = re.sub(
+            r'\\begin\{equation\*\}(.*?)\\end\{equation\*\}', 
+            lambda m: f'\\[\n{m.group(1)}\n\\]', 
+            content, flags=re.DOTALL
+        )
+        return content
+
+    def split_long_equation(match):
+        eq = match.group(1)
+        if len(eq) > 50:  # Adjust this threshold as needed
+            parts = eq.split(',')
+            return '$ ' + ' $\n$ '.join(parts) + ' $'
+        return f'${eq}$'
+
+    latex_content = custom_latex_commands(latex_content) # add custom commands
+    latex_content = handle_environments(latex_content)
+    # matplotlib breaks for some reason if there are double dollar signs
+    latex_content = re.sub(r'\$\$(.*?)\$\$', lambda m: f'\n${m.group(1)}$\n', latex_content, flags=re.DOTALL)
+
+    # latex_content = re.sub(r'\$(.+?)\$', split_long_equation, latex_content)
+
+    
+    plt.text(0.5, 0.5, latex_content, size=12, ha='center', va='center', wrap=True)
+    
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format='png', bbox_inches='tight', pad_inches=0.1, dpi=300)
+    img_buffer.seek(0)
+    
+    plt.close()
+    
+    return img_buffer.getvalue()
+
+def process_latex(content):
+    # Replace '\\' with '\' in the content
+    content = content.replace('\\\\', '\\')
+    
+    # Process inline LaTeX
+    content = re.sub(r'\$(.+?)\$', r'$\1$', content)
+    content = re.sub(r'\\\((.+?)\\\)', r'$\1$', content)
+    
+    # Process display LaTeX
+    content = re.sub(r'\$\$(.+?)\$\$', r'\[\1\]', content, flags=re.DOTALL)
+    content = re.sub(r'\\\[(.+?)\\\]', r'\[\1\]', content, flags=re.DOTALL)
+    
+    return content
+
+def format_question_in_latex(question, answer):
+    return r"""
+\textbf{Question:}
+    \n\n
+%s
+    
+\textbf{Answer:}
+ \n\n   
+%s
+""" % (question, answer)
+
 def process_and_send_emails():
     question_sets_dir = QUESTION_SETS_DIR
     for set_dir in os.listdir(question_sets_dir):
@@ -113,11 +225,21 @@ def process_and_send_emails():
             with open(os.path.join(set_path, "config.json"), 'r') as config_file:
                 config = json.load(config_file)
             
-            print(config)
             internal_name = config["internal_name"]
             subject_title = config["subject_title"]
             keys_are_questions = config["keys_are_question"]
             qa_pairs_file = os.path.join(set_path, config["qa_pairs_file"])
+            num_questions = config.get("num_questions", 2)
+            question_algorithm = config.get("question_algorithm", "least_recently_chosen")
+            paused = config.get("paused", "false")
+
+            if internal_name != 'lin_alg':
+                continue
+
+            if paused == "true":
+                print(f"Paused: {internal_name}")
+                continue
+
             print(qa_pairs_file)
 
             processed_dict = read_processed_files(internal_name)
@@ -125,19 +247,45 @@ def process_and_send_emails():
             with open(qa_pairs_file, 'r', encoding='utf-8') as file:
                 qa_pairs = json.load(file)
             
-            selected_questions = pick_least_recently_sent_questions(qa_pairs, processed_dict)
+            picking_algorithm = get_picking_algorithm(question_algorithm)
+            selected_questions = picking_algorithm(qa_pairs, processed_dict, num_questions)
             
             print(selected_questions)
             content = ''
-            for question in selected_questions:
+            image_dict = {}
+            
+            for i, question in enumerate(selected_questions):
                 current_content = qa_pairs[question]
                 if keys_are_questions == "true":
-                    print("Keys are questions")
-                    current_content = format_question_in_markdown(question, qa_pairs[question])
-                    
-                content += render_markdown_latex(current_content) + '<br><br>'
+                    print(f"Processing question: {question}")
+                    print(f"Answer: {qa_pairs[question]}")
+                    latex_content = f"Question: {question}\n\nAnswer: {qa_pairs[question]}"
+                else:
+                    latex_content = current_content
+
+                latex_image = latex_to_image(latex_content)
+                if latex_image is not None:
+                    cid = f"latex_img_{i}"
+                    image_dict[cid] = latex_image
+                    content += f'<img src="cid:{cid}" alt="LaTeX content"><br><br>'
+                else:
+                    content += f'<pre>{html.escape(latex_content)}</pre><br><br>'
+
+                # Process [IMAGE_WORD] tags
+                parts = re.split(r'(\[IMAGE_WORD\]\(.*?\))', current_content)
+                for part in parts:
+                    if part.startswith('[IMAGE_WORD]'):
+                        image_filename = re.search(r'\((.*?)\)', part).group(1)
+                        images_dir = os.path.join(set_path, "images")
+                        full_image_path = find_image_file(images_dir, image_filename)
+                        if full_image_path:
+                            cid = f"img_{len(image_dict)}"
+                            image_dict[cid] = full_image_path
+                            content += f'<img src="cid:{cid}" alt="{image_filename}"><br><br>'
+                        else:
+                            print(f"Warning: Image not found: {image_filename}")
             
-            send_email(content, f"Question Digest: {subject_title}")
+            send_email(content, f"Question Digest: {subject_title}", image_dict)
             write_processed_files(selected_questions, internal_name)
 
 if __name__ == '__main__':
