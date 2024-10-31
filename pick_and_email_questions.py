@@ -149,6 +149,7 @@ def latex_to_image(latex_content):
         content = re.sub(r'\\complex', r' \\mathbb{C}', content)
         content = re.sub(r'\\reals', r' \\mathbb{R}', content)
         content = re.sub(r'\\matrixset\{(.+?)\}\{(.+?)\}', r' M_{\1}(\2)', content)
+        content = re.sub(r'\\range', r' \\operatorname{range}', content)
         return content
 
     # Handle LaTeX environments like align*, equation*, etc.
@@ -175,6 +176,9 @@ def latex_to_image(latex_content):
         return f'${eq}$'
 
     latex_content = custom_latex_commands(latex_content) # add custom commands
+    print("=======================")
+    print(latex_content)
+    print("=======================")
     latex_content = handle_environments(latex_content)
     # matplotlib breaks for some reason if there are double dollar signs
     latex_content = re.sub(r'\$\$(.*?)\$\$', lambda m: f'\n${m.group(1)}$\n', latex_content, flags=re.DOTALL)
