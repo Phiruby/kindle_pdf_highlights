@@ -40,23 +40,34 @@ class GitRepoBrowser:
         url = f"{self.api_url}/git/trees/{self.branch}?recursive=1"
         response = requests.get(url, headers=self.headers)
 
-        root_tree = Node("root", NodeType.DIRECTORY)
         if response.status_code == 200:
             tree_data = response.json().get("tree", [])
+            root_tree = Node("root", NodeType.DIRECTORY)
+            nodes = {"": root_tree}
 
             for item in tree_data:
+                item_path = item["path"]
+                parent_path = "/".join(item_path.split("/")[:-1])
+                parent_node = nodes.get(parent_path, root_tree)
+
                 if item["type"] == "blob":
-                    last_commit_date = self._get_last_commit_date(item["path"])
-                    root_tree.add_child(Node(
-                        name=item["path"].split("/")[-1],
+                    last_commit_date = self._get_last_commit_date(item_path)
+                    if (last_commit_date == "Unknown"):
+                        print(f"WARNING: Could not get last commit date for {item_path}")
+                        continue
+                    new_node = Node(
+                        name=item_path.split("/")[-1],
                         type=NodeType.FILE,
                         last_updated=last_commit_date
-                    ))
+                    )
                 elif item["type"] == "tree":
-                    root_tree.add_child(Node(
-                        name=item["path"].split("/")[-1],
+                    new_node = Node(
+                        name=item_path.split("/")[-1],
                         type=NodeType.DIRECTORY
-                    ))
+                    )
+
+                parent_node.add_child(new_node)
+                nodes[item_path] = new_node
 
             return root_tree
         else:
@@ -98,4 +109,22 @@ class GitRepoBrowser:
             return file_decoded
         else:
             raise RuntimeError(f"Failed to get file content: {response.status_code} {response.text}")
+
+
+# Example Usage:
+if __name__ == "__main__":
+    # Initialize the GitRepoBrowser with the repository URL and branch
+    repo_browser = GitRepoBrowser(
+        repo_url="https://github.com/Phiruby/obsidian_notes.git", 
+        branch="main", 
+        token=os.getenv("GIT_PERSONAL_ACCESS_TOKEN")  # Optional for private repos or higher rate limits
+    )
+
+    # Get the directory tree at the root
+    try:
+        directory_tree = repo_browser.get_directory_tree()
+        print("Directory Tree:")
+        directory_tree.print_tree()
+    except RuntimeError as e:
+        print(f"Error: {e}")
 

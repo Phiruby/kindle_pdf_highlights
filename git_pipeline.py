@@ -1,5 +1,7 @@
 import json
 from git_services.GitService import GitRepoBrowser
+import os 
+
 def load_json_from_file(file_path):
     with open(file_path, 'r', encoding='utf-8') as file:
         data = json.load(file)
@@ -19,4 +21,4 @@ if __name__ == "__main__":
         token=os.getenv("GIT_PERSONAL_ACCESS_TOKEN")  # Optional for private repos or higher rate limits
     )
     directory_tree = repo_browser.get_directory_tree()
-    print(data)
+    
